@@ -133,7 +133,7 @@ export function fisPdf(s, tur = 'fis') {
     <tr class="kalin"><td>Kalan</td><td class="sayi ${o.kalan > 0 ? 'negatif' : ''}">${para(o.kalan)}</td></tr>
   </tbody></table>` : `<p class="ipucu">Bu teklif 7 gün geçerlidir. Siparişi onaylamak için bize yazmanız yeterli.</p>`}
   ${s.not ? `<h3>Not</h3><p class="rp-not">${esc(s.not)}</p>` : ''}
-  <div class="rp-sonuc">${teklif ? 'İlginiz için teşekkür ederiz. El yapımı ürünlerimiz siparişe özel hazırlanır.' : 'Siparişiniz için teşekkür ederiz! Ürününüz özenle, elde hazırlanmaktadır.'}</div>`;
+  <div class="rp-sonuc">${teklif ? 'İlginiz için teşekkür ederiz. Ürünlerimiz siparişe özel, size göre hazırlanır.' : 'Siparişiniz için teşekkür ederiz! Ürününüz size özel olarak, özenle hazırlanmaktadır.'}</div>`;
   const ad = (teklif ? 'Teklif-' : 'Siparis-fisi-') + (m?.ad || s.musteri || s.urunAd || 'musteri').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '-').slice(0, 40);
   return pdfUret(govde, ad + '.pdf');
 }
@@ -176,7 +176,7 @@ export async function musteriRaporuPdf(s) {
   const dukkan = [st.ayar.instagram && 'Instagram: @' + st.ayar.instagram.replace(/^@/, ''), st.ayar.whatsapp && 'WhatsApp: ' + st.ayar.whatsapp].filter(Boolean);
   const kart = (e, d, alt = '') => `<div class="rp-kartcik"><div class="e">${e}</div><div class="d">${d}</div>${alt ? `<div class="e">${alt}</div>` : ''}</div>`;
   const ad = m?.ad || (s.musteri || '').replace(/^@/, '');
-  const no = (s.id || '').slice(-6).toLocaleUpperCase('tr');
+  const no = (s.id || '').slice(-6).toUpperCase();
   const igDukkan = st.ayar.instagram ? '@' + st.ayar.instagram.replace(/^@/, '') : '@envai_tasarim';
   // Kurumsal görünüm: amblem + ENVAİ TASARIM yazısı (lacivert, logodaki gibi), logo renklerinde ince şerit
   const govde = `
@@ -211,7 +211,7 @@ export async function musteriRaporuPdf(s) {
   </style>
   <div class="mr-antet rp-blok">
     <div class="mr-marka"><img src="logo/envai-amblem.png" alt="">
-      <div class="mr-ad"><b>ENVAİ</b><span>TASARIM</span><small>El yapımı · Kişiye özel nakış ve dikiş</small></div></div>
+      <div class="mr-ad"><b>ENVAİ</b><span>TASARIM</span><small>Kişiye özel nakış ve dikiş</small></div></div>
     <div class="mr-belge"><div class="t">TESLİM RAPORU</div>${no ? `<div>Sipariş no: <b>${esc(no)}</b></div>` : ''}<div>Düzenlenme: ${ustTarihSaat().tarih}</div></div>
   </div>
   <div class="mr-serit"></div>
@@ -237,7 +237,7 @@ export async function musteriRaporuPdf(s) {
   </div>
   <div class="mr-tesekkur rp-blok"><img src="logo/envai-amblem.png" alt="">
     <div><h4>Bizi tercih ettiğiniz için teşekkür ederiz!</h4>
-      <p>Ürününüz el emeğiyle, ilmek ilmek özenle hazırlandı; güzel günlerde kullanmanızı dileriz. Memnuniyetiniz bizim için en büyük ödül:
+      <p>Ürününüz size özel olarak, büyük bir özen ve titizlikle hazırlandı; güzel günlerde kullanmanızı dileriz. Memnuniyetiniz bizim için en büyük ödül:
         görüşlerinizi bizimle paylaşır, ürününüzün fotoğrafını Instagram'da <b>${esc(igDukkan)}</b> etiketiyle paylaşırsanız çok mutlu oluruz.</p>
       <p class="mr-imza">Sevgiyle, Envai Tasarım</p>
       <div class="mr-alt">${dukkan.map(x => { const [k, v] = x.split(': '); return `<span>${esc(k)}: <b>${esc(v)}</b></span>`; }).join('')}<span>Yeni siparişleriniz için bize her zaman yazabilirsiniz</span></div></div></div>`;
