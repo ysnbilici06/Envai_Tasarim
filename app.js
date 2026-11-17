@@ -877,7 +877,14 @@ view.addEventListener('input', e => {
 });
 view.addEventListener('change', e => {
   const t = e.target;
-  if (t.dataset.ayar) S.ayarKaydet({ [t.dataset.ayar]: oku(t.value) });
+  if (t.dataset.ayar) {
+    // Boş bırakılan hedef kâr varsayılan %50'ye döner (yer tutucu "50" ile hesap aynı olsun); eksi değer 0 olur
+    const bos = t.value.trim() === '';
+    const v = t.dataset.ayar === 'hedefKar' && bos ? 50 : Math.max(0, oku(t.value));
+    S.ayarKaydet({ [t.dataset.ayar]: v });
+    if (t.dataset.ayar === 'hedefKar' && bos) { t.value = '50'; bildirim('Hedef kâr boş bırakılamaz, %50 olarak ayarlandı'); }
+    else if (oku(t.value) < 0) { t.value = '0'; bildirim('Eksi değer girilemez'); }
+  }
   if (t.dataset.ayarMetin) S.ayarKaydet({ [t.dataset.ayarMetin]: t.value.trim().replace(/^@/, '') });
   if (t.dataset.rapor) { rapor[t.dataset.rapor] = t.value; ciz(); }
   if (t.dataset.actChange === 'yedek-yukle' && t.files[0]) yedekYukle(t.files[0]);
@@ -941,6 +948,10 @@ function isDuzenle(id, taslak, sonra) {
     kaydet: () => {
       u.ad = u.ad.trim();
       if (!u.ad) { bildirim('İşin adını yazın'); $('[name=ad]', d).focus(); return false; }
+      // Eksi değer hesapları bozar (eksi fiyat = zarar görünür, eksi emek = maliyet düşer)
+      const eksi = [['satisFiyati', 'Satış fiyatı'], ['iscilikSaat', 'Emek süresi'], ['fire', 'Fire oranı']].find(([k]) => u[k] < 0);
+      if (eksi) { bildirim(`${eksi[1]} eksi olamaz`); $(`[name=${eksi[0]}]`, d)?.focus(); return false; }
+      if ((u.kalemler || []).some(k => k.miktar < 0)) { bildirim('Malzeme miktarı eksi olamaz'); return false; }
       const kayit = S.kaydet('urunler', u);
       bildirim('Kaydedildi');
       sonra?.(kayit);
@@ -1174,7 +1185,10 @@ function malzemeDuzenle(id, sonra, onAd = '') {
     kaydet: () => {
       m.ad = m.ad.trim(); m.birim = (m.birim || '').trim() || 'adet'; m.kategori = (m.kategori || '').trim();
       if (!m.ad) { bildirim('Malzeme adını yazın'); return false; }
-      if (!(m.paketMiktar > 0)) { bildirim('Aldığınız miktar 0 olamaz'); return false; }
+      if (!(m.paketMiktar > 0)) { bildirim(m.paketMiktar < 0 ? 'Aldığınız miktar eksi olamaz' : 'Aldığınız miktar 0 olamaz'); return false; }
+      if (m.paketFiyat < 0) { bildirim('Fiyat eksi olamaz'); $('[name=paketFiyat]', d)?.focus(); return false; }
+      if (m.stok != null && m.stok < 0) { bildirim('Stok eksi olamaz'); return false; }
+      if (m.kritik != null && m.kritik < 0) { bildirim('Uyarı sınırı eksi olamaz'); return false; }
       const kayit = S.kaydet('malzemeler', m);
       bildirim('Kaydedildi');
       sonra?.(kayit);

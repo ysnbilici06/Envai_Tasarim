@@ -14,13 +14,33 @@ export function musteriBul(yazi) {
   if (!k) return null;
   return Object.values(st.musteriler).find(m => kucuk(m.ad) === k || (m.instagram && kucuk(m.instagram) === k)) || null;
 }
-export function musteriSatislari(m) {
+/** Tek geçişte: ad/Instagram → müşteri haritası ve müşteri id → satışları. Liste çizimi O(müşteri + satış) olur
+ *  (eskiden her müşteri için her satışta tüm müşteriler taranıyordu; çok kayıtta iPad'de takılıyordu). */
+function satisIndeksi() {
+  const ad = new Map();
+  for (const m of Object.values(st.musteriler)) {   // musteriBul ile aynı öncelik: ilk eşleşen müşteri
+    const a = kucuk(m.ad), i = kucuk(m.instagram);
+    if (a && !ad.has(a)) ad.set(a, m.id);
+    if (i && !ad.has(i)) ad.set(i, m.id);
+  }
+  const satis = new Map();
+  for (const s of Object.values(st.satislar)) {
+    const id = st.musteriler[s.musteriId] ? s.musteriId : ad.get(kucuk(s.musteri));
+    if (!id) continue;
+    if (!satis.has(id)) satis.set(id, []);
+    satis.get(id).push(s);
+  }
+  for (const l of satis.values()) l.sort((a, b) => (b.tarih || '').localeCompare(a.tarih || ''));
+  return { ad, satis };
+}
+export function musteriSatislari(m, idx) {
+  if (idx) return idx.satis.get(m.id) || [];
   return Object.values(st.satislar)
     .filter(s => s.musteriId === m.id || (!st.musteriler[s.musteriId] && musteriBul(s.musteri)?.id === m.id))
     .sort((a, b) => (b.tarih || '').localeCompare(a.tarih || ''));
 }
-export function musteriOzet(m) {
-  const l = musteriSatislari(m).filter(s => s.durum !== 'iptal');
+export function musteriOzet(m, idx) {
+  const l = musteriSatislari(m, idx).filter(s => s.durum !== 'iptal');
   return {
     satislar: l, adet: l.length,
     toplam: l.reduce((t, s) => t + satisHesap(s).ciro, 0),
@@ -32,13 +52,14 @@ export function musteriOzet(m) {
 let ara = '';
 export function musterilerGorunum() {
   const a = kucuk(ara);
+  const idx = satisIndeksi();
   const liste = Object.values(st.musteriler)
     .filter(m => !a || `${m.ad} ${m.instagram} ${m.telefon}`.toLocaleLowerCase('tr').includes(a)
       || (a.replace(/\D/g, '').length >= 3 && (m.telefon || '').replace(/\D/g, '').includes(a.replace(/\D/g, ''))))
-    .map(m => ({ m, o: musteriOzet(m) }))
+    .map(m => ({ m, o: musteriOzet(m, idx) }))
     .sort((x, y) => (y.o.son || '').localeCompare(x.o.son || '') || trSirala(x.m.ad || '', y.m.ad || ''));
   // Kayıtlı olmayan ama satışlarda adı geçen müşteriler: tek dokunuşla kaydet
-  const kayitsiz = [...new Set(Object.values(st.satislar).filter(s => s.musteri && !st.musteriler[s.musteriId] && !musteriBul(s.musteri)).map(s => s.musteri.trim()))];
+  const kayitsiz = [...new Set(Object.values(st.satislar).filter(s => s.musteri && !st.musteriler[s.musteriId] && !idx.ad.has(kucuk(s.musteri))).map(s => s.musteri.trim()))];
   const toplam = Object.keys(st.musteriler).length;
   return `
   <div class="baslik"><h1>Müşteriler</h1><button class="btn ana kucuk" data-act="mus-yeni">+ Müşteri</button></div>
