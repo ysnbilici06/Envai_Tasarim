@@ -249,6 +249,82 @@ export const URUNLER = {
     aciklama: 'Şapka üzerine kişiye özel nakış çalışması 🪡 İsim, logo ya da kısa bir yazıyla tarzınızı yansıtın 🧢',
     etiket: ['#nakışlışapka', '#kişiyeözelşapka'],
   },
+  hastane: {
+    ad: 'Hastane Çıkışı Seti', baslik: 'İsme Özel Nakışlı Hastane Çıkışı', cumle: 'hastane çıkışı seti', nakis: true, emoji: '👶',
+    kancalar: ['Minik bebeğimiz için isimli hastane çıkışı hazır 👶', 'Hoş geldin bebek! 🍼 İsme özel hastane çıkışı', 'Hayatının ilk kıyafeti ona özel olsun 🤍'],
+    ozellikler: ['Bebeğin ismi nakışla işlenir', 'Yıkamada solmaz, çıkmaz'],
+    aciklama: 'İsme özel nakışlı hastane çıkışı seti 👶 Bebeğinizin ismi ilmek ilmek işlenir; baskı değil nakış olduğu için yıkamada solmaz. Doğum hediyesi için de harika bir seçenek 🤍',
+    etiket: ['#hastaneçıkışı', '#isimlihastaneçıkışı', '#bebekhediyesi', '#yenidoğan', '#hoşgeldinbebek'],
+    siparis: 'bebeğin ismi, renk tercihi (pembe / mavi / krem) ve doğum tarihi',
+  },
+  battaniye: {
+    ad: 'Battaniye', cumle: 'battaniye', nakis: true, emoji: '🧸',
+    kancalar: ['İsme özel nakışlı battaniye hazır 🧸', 'Sıcacık ve tamamen size özel 🤍', 'En tatlı hediye: isimli battaniye 🎁'],
+    ozellikler: ['İsim / tarih nakışı', 'Bebek ve çocuk hediyesi için ideal'],
+    aciklama: 'Battaniye üzerine kişiye özel nakış çalışması 🧸 Bebeğinize, çocuğunuza ya da sevdiklerinize isim ve sevimli motiflerle sıcacık bir hediye 🤍',
+    etiket: ['#isimlibattaniye', '#bebekbattaniyesi', '#nakışlıbattaniye', '#bebekhediyesi'],
+  },
+  bohca: {
+    ad: 'Çeyiz Bohçası', cumle: 'çeyiz bohçası', nakis: true, emoji: '🎀',
+    kancalar: ['Çeyiz bohçası hazırlandı 🎀', 'Gelin hanıma özel nakışlı bohça ✨', 'Çeyiziniz el emeğiyle daha da güzel 🤍'],
+    ozellikler: ['Gelin ve damat isimleri işlenir', 'Çeyiz ve düğün bohçası için ideal'],
+    aciklama: 'Kişiye özel nakışlı çeyiz bohçası ve hurç 🎀 Gelin ve damadın isimleri, düğün tarihiyle birlikte zarif motiflerle işlenir. Çeyizinize el emeği bir dokunuş 🤍',
+    etiket: ['#çeyizbohçası', '#bohça', '#hurç', '#çeyiz', '#gelinbohçası'],
+    siparis: 'gelin ve damadın isimleri, düğün tarihi ve renk tercihi',
+  },
+  ibadet: {
+    ad: 'Kuran / Tesbih Kesesi', cumle: 'Kuran kesesi', nakis: true, emoji: '📿',
+    kancalar: ['İsme özel nakışlı Kuran kesesi 📿', 'Hac, umre ve mevlit için anlamlı hediye 🤲', 'Seccade setinize isimli kese ✨'],
+    ozellikler: ['İsim nakışı', 'Hac, umre ve mevlit hediyesi'],
+    aciklama: 'Kişiye özel nakışlı Kuran kesesi ve tesbih kesesi 📿 Seccade setleriyle birlikte; hac, umre, mevlit ya da sevdiklerinize anlamlı bir hediye 🤲',
+    etiket: ['#kurankesesi', '#tesbihkesesi', '#seccadeseti', '#hacumrehediyesi', '#mevlüthediyesi'],
+  },
+  kina: {
+    ad: 'Kına Aksesuarı', baslik: 'Nakışlı Kına Şalı ve Aksesuarları', cumle: 'kına şalı', nakis: true, emoji: '❤️',
+    kancalar: ['Kına gecesine özel nakışlı şal 🔴', 'Gelin hanımın en özel gecesi ✨', 'Kına için isimli eldiven ve şal hazır ❤️'],
+    ozellikler: ['İsim / tarih nakışı', 'Kına gecesi için ideal'],
+    aciklama: 'Kına gecesine özel nakış işlemeli şal, duvak ve eldiven ❤️ Gelinin ismi ve tarih işlenir; nakış olduğu için yapıştırma süslere göre çok daha dayanıklıdır. Güzel günlerde kullanılsın ✨',
+    etiket: ['#kınagecesi', '#kınaşalı', '#kınaaksesuarı', '#gelin', '#kınabohçası'],
+    siparis: 'gelinin ismi, kına tarihi ve renk tercihi',
+  },
+  gelinlik: {
+    ad: 'Gelinlik / Abiye', baslik: 'Gelinlik ve Abiye Dikim / Tadilat', cumle: 'gelinlik', nakis: false, emoji: '👰',
+    kancalar: ['Gelinliğiniz tam ölçünüze göre 👰', 'Prova günü ✨ son dokunuşlar', 'Abiye ve nişanlık tadilatları özenle yapılır 🪡'],
+    ozellikler: ['Daraltma, boy, kol ve askı tadilatı', 'Fermuar değişimi ve detay onarım', 'Özenli işçilik'],
+    aciklama: 'Gelinlik, nişanlık, abiye ve kına kıyafetlerinde dikim ve tadilat 👰 Daraltma, boy kısaltma, kol ve askı ayarı, fermuar değişimi… Özel gününüzde kıyafetiniz tam size göre olsun ✨',
+    etiket: ['#gelinliktadilatı', '#abiyedikim', '#nişanlık', '#terzi', '#özeldikim'],
+    siparis: 'kıyafetin türü, yapılacak işlem ve prova için uygun gün',
+  },
+  patch: {
+    ad: 'Arma / Logo Nakışı', baslik: 'Logo ve Arma Nakışı', cumle: 'logo nakışı', nakis: true, emoji: '🏷️',
+    kancalar: ['Logonuz nakışla işlendi 🏷️', 'İş kıyafetlerinize kurumsal dokunuş ✨', 'Takımınıza, okulunuza özel arma 🪡'],
+    ozellikler: ['Logo / arma nakışı', 'İş kıyafeti, önlük ve şapkaya uygun', 'Toplu siparişe uygun'],
+    aciklama: 'İş yerinize, takımınıza ya da okulunuza özel logo ve arma nakışı 🏷️ Tişört, önlük, şapka ve iş kıyafetlerine işlenir; yıkamaya dayanıklıdır. Toplu siparişler alınır.',
+    etiket: ['#logonakışı', '#arma', '#işkıyafeti', '#kurumsalnakış', '#toplusipariş'],
+    siparis: 'logo dosyası, ürün türü ve adet',
+  },
+  koltuk: {
+    ad: 'Koltuk Örtüsü', cumle: 'koltuk örtüsü', nakis: true, emoji: '🛋️',
+    kancalar: ['Koltuklarınıza el emeği dokunuş 🛋️', 'Salonunuzun havası değişecek ✨', 'Ölçüye özel koltuk örtüsü hazır 🤍'],
+    ozellikler: ['Ölçüye göre dikilir', 'Nakış ya da dantel detay eklenebilir'],
+    aciklama: 'Ölçüye özel koltuk örtüsü ve şal 🛋️ Dilerseniz nakış ya da dantel detaylarla süslenir; salonunuza zarif, el emeği bir dokunuş 🤍',
+    etiket: ['#koltukörtüsü', '#koltukşalı', '#evdekorasyonu', '#çeyiz'],
+  },
+  makine: {
+    ad: 'Nakış Çalışması', baslik: 'Kişiye Özel Nakış Çalışması', cumle: 'nakış çalışması', nakis: true, emoji: '🪡',
+    kancalar: ['Nakış makinesinde işleniyor 🪡', 'Siparişiniz ilmek ilmek hazırlanıyor ✨', 'Sizce ne çıkacak? 👀'],
+    ozellikler: ['Makine nakışı, temiz işçilik', 'İsim, logo ya da desen işlenir'],
+    aciklama: 'Atölyeden bugün: siparişiniz nakış makinesinde ilmek ilmek işleniyor 🪡 İsim, tarih, logo ya da sevdiğiniz bir desen… İstediğiniz ürüne kişiye özel nakış yapılır ✨',
+    etiket: ['#nakışmakinesi', '#makinenakışı', '#atölye', '#nakışçalışması'],
+  },
+  dikis: {
+    ad: 'Dikiş / Tadilat', baslik: 'Kişiye Özel Dikim ve Tadilat', cumle: 'dikiş', nakis: false, emoji: '🧵',
+    kancalar: ['Atölyeden bugün 🧵', 'Dikiş makinesi durmuyor ✂️', 'Ölçünüze göre dikiyorum 🪡'],
+    ozellikler: ['Kişiye özel dikim', 'Tadilat, paça, fermuar değişimi', 'Özenli ve temiz işçilik'],
+    aciklama: 'Kişiye özel kıyafet dikimi ve her türlü tadilat 🧵 Paça, daraltma, fermuar değişimi, perde ve nevresim dikimi… Temiz işçilik ve özenle 🪡',
+    etiket: ['#dikiş', '#terzi', '#tadilat', '#özeldikim', '#fermuardeğişimi'],
+    siparis: 'yapılacak işlem ve ölçüler',
+  },
   perde: {
     ad: 'Perde', cumle: 'perde', nakis: true, emoji: '🪟',
     kancalar: ['Perdenize nakışlı bir dokunuş ✨', 'Pencerenize el emeği zarafet 🪟', 'Evinizin havası değişecek 🤍'],
@@ -265,6 +341,8 @@ export const MOTIFLER = {
   monogram: { ad: 'harf nakışı', sifat: 'Harf Nakışlı', ozellik: 'Baş harf (monogram) nakışı', cumle: 'Baş harfinizle zarif ve şık bir dokunuş ✨' },
   geleneksel: { ad: 'geleneksel motif', sifat: 'Motif Nakışlı', ozellik: 'Geleneksel motif işleme', cumle: 'Geleneksel motifler modern bir dokunuşla 🧿' },
   kabe: { ad: 'Kabe nakışı', sifat: 'Kabe Nakışlı', ozellik: 'Kabe-i Muazzama nakışı', cumle: 'Kabe nakışlı modelimiz çok sevildi, siparişler hazırlanmaya devam ediyor ❤️' },
+  kalp: { ad: 'kalp nakışı', sifat: 'Kalp Nakışlı', ozellik: 'Kalp motifli nakış', cumle: 'Kalp motifiyle sevginizi ilmek ilmek işledik ❤️' },
+  logo: { ad: 'logo nakışı', sifat: 'Logo Nakışlı', ozellik: 'Logo / yazı nakışı', cumle: 'Logonuz ya da yazınız birebir işlenir 🏷️' },
   dantel: { ad: 'dantel detay', sifat: 'Dantel Detaylı', ozellik: 'Zarif dantel detaylar', cumle: 'Dantel detaylarıyla zarif bir görünüm 🤍' },
   duz: { ad: '', sifat: 'Kişiye Özel Nakışlı', ozellik: 'Özenle, ilmek ilmek işlendi', cumle: '' },
 };
@@ -285,7 +363,10 @@ export function metinOner(urunK, motifK, renk = '') {
   if (renk) kancalar.push(`${buyukHarf(renk)} tonlarında ${u.cumle} ${u.emoji}`);
   kancalar.push('Teslim etmeden önce son hali 😍', 'Siparişiniz hazır! ✨');
   const ozellikler = u.nakis ? [u.ozellikler[0], m.ozellik, u.ozellikler[1]] : u.ozellikler.slice(0, 3);
-  const aciklama = [u.aciklama, m?.cumle].filter(Boolean).join(' ');
+  // Siparişte müşteriden istenecek bilgi (araştırma: ilanlar kişiselleştirmeyi açıkça yazıyor)
+  const siparis = u.siparis || (u.nakis ? 'isim, renk ve tarih' : 'ölçüler ve yapılacak işlem');
+  // Instagram açıklamada ilk ~125 karakter görünür: en güçlü cümle başta
+  const aciklama = [u.aciklama, m?.cumle].filter(Boolean).join(' ') + `\n\n📝 Sipariş için ${siparis} bilgisini DM'den iletmeniz yeterli.`;
   // Kısa reklam cümleleri (tek dokunuşla kopyalanır)
   const reklam = [
     aciklama,
@@ -293,6 +374,7 @@ export function metinOner(urunK, motifK, renk = '') {
     `${baslik} ✨ Tamamen el emeği, tamamen size özel. ${renk ? buyukHarf(renk) + ' ve dilediğiniz renklerde' : 'Dilediğiniz renk ve desende'} hazırlanır 🤍`,
     u.nakis ? 'Sevdiklerinize unutulmayacak bir hediye: isim, tarih ya da motifle kişiye özel nakış 🎁' : 'Ölçünüze ve zevkinize göre, özenle hazırlanır ✂️',
     `Müşteri isteği üzerine hazırladım 😍 ${baslik} ${u.emoji} Güzel günlerde kullanılsın ❤️ Siparişleriniz ve bilgi için DM 📩`,
+    u.nakis ? 'Baskı değil, nakış! 🪡 İlmek ilmek işlendiği için yıkamada solmaz, çıkmaz; yıllarca ilk günkü gibi kalır ✨' : 'Temiz işçilik, zamanında teslim ✂️ Atölyemizde her iş tek tek, özenle hazırlanır 🤍',
   ];
   return { baslik, kancalar: [...new Set(kancalar)], ozellikler, aciklama, reklam, etiket: u.etiket };
 }
