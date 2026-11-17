@@ -73,6 +73,7 @@ export function musteriDuzenle(id, sonra, onAd = '') {
         <label class="alan">Telefon<input name="telefon" value="${esc(m.telefon)}" inputmode="tel" placeholder="05xx xxx xx xx"></label>
       </div>
       <label class="alan">Adres<textarea name="adres" rows="2" placeholder="Kargo / teslim adresi">${esc(m.adres)}</textarea></label>
+      <label class="alan">Diğer sosyal medya<input name="sosyal" value="${esc(m.sosyal || '')}" placeholder="Örn. TikTok @kullanici · Facebook adı" autocapitalize="off"></label>
     </div>
     <div class="bolum"><h3>Beden ölçüleri <small>cm</small></h3>
       <div class="olcu-izgara">${[...OLCULER, ...ekOlcu].map(k => `<label class="alan">${esc(k)}<div class="birimli"><input data-olcu="${esc(k)}" inputmode="decimal" value="${esc(m.olculer[k] ?? '')}"><span class="b">cm</span></div></label>`).join('')}</div>

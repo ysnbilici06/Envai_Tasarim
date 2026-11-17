@@ -445,8 +445,20 @@ function raporlar() {
   ${t.isTablo ? `<div class="kart ic rapor-bolum">${t.isTablo}</div>` : ''}
   ${t.katTablo ? `<div class="kart ic rapor-bolum">${t.katTablo}</div>` : ''}
   ${t.malzTablo ? `<div class="kart ic rapor-bolum">${t.malzTablo}</div>` : ''}
-  ${t.ayTablo ? `<div class="kart ic rapor-bolum">${t.ayTablo}</div>` : ''}`
+  ${t.ayTablo ? `<div class="kart ic rapor-bolum">${t.ayTablo}</div>` : ''}
+  ${musteriRaporListesi(bas, bit)}`
   : `<div class="kart bos"><div class="simge">📊</div><p>Bu dönemde satış yok.<br>Başka bir dönem seçin ya da satış ekleyin.</p></div>`}`;
+}
+
+/** Raporlar: dönemde biten işler için müşteri teslim raporu listesi */
+function musteriRaporListesi(bas, bit) {
+  const l = Object.values(st.satislar).filter(s => BITTI.includes(s.durum) && s.tarih >= bas && s.tarih <= bit)
+    .sort((a, b) => (b.zaman?.teslim || b.zaman?.bitti || b.tarih || '').localeCompare(a.zaman?.teslim || a.zaman?.bitti || a.tarih || ''));
+  if (!l.length) return '';
+  return `<div class="kart ic rapor-bolum"><h3>🎁 Müşteri teslim raporları <small class="soluk">biten işler · müşteriye gönderilecek PDF</small></h3>
+    <div class="liste">${l.slice(0, 40).map(s => `<div class="satir" style="cursor:default"><div class="orta"><div class="ad">${esc(s.urunAd || 'Özel iş')}</div>
+      <div class="ek">${esc([s.musteri, tarihYaz((s.zaman?.teslim || s.zaman?.bitti || s.tarih || '').slice(0, 10)), para(satisHesap(s).ciro)].filter(Boolean).join(' · '))}</div></div>
+      <div class="sag"><button class="btn kucuk" data-act="musteri-rapor" data-id="${s.id}">🧾 Rapor</button></div></div>`).join('')}</div></div>`;
 }
 
 /** Raporun ek bölümleri: genel giderler + net kâr, tahsilat, sipariş kaynakları (ekran + PDF ortak) */
@@ -551,18 +563,22 @@ function isBittiSor(s) {
         <p class="soluk">${esc(s.musteri || '')}${s.musteri ? ' · ' : ''}${para(satisHesap(s).ciro)}</p></div>
       <button class="secenek ana" data-k="studyo"><span class="s-simge">📸</span><span><b>Ürünün fotoğrafını / videosunu çek</b>
         <small>Instagram ve WhatsApp için tanıtım videosu ve ürün görselleri hazırlansın</small></span></button>
+      <button class="secenek" data-k="musteri-rapor"><span class="s-simge">🧾</span><span><b>Müşteri teslim raporu (PDF)</b>
+        <small>Ürün görseli, fiyat, sipariş / teslim tarihi ve müşteri bilgileri · müşteriye gönderin</small></span></button>
       <button class="secenek" data-k="pdf"><span class="s-simge">📄</span><span><b>İş raporu (PDF)</b>
         <small>Zaman ve fiyat açısından kâr / zarar</small></span></button>
     </div>`,
   });
   d.addEventListener('click', e => {
-    const t = e.target.closest('[data-k=studyo],[data-k=pdf]');
+    const t = e.target.closest('[data-k=studyo],[data-k=pdf],[data-k=musteri-rapor]');
     if (!t) return;
     d.close();
-    if (t.dataset.k === 'studyo') tanitimStudyosu(st.satislar[s.id] || s); else isRaporu(st.satislar[s.id] || s);
+    const g = st.satislar[s.id] || s;
+    if (t.dataset.k === 'studyo') tanitimStudyosu(g); else if (t.dataset.k === 'musteri-rapor') musteriRaporu(g); else isRaporu(g);
   });
 }
 const isRaporu = s => pdfVer(() => R.isRaporuPdf(s, st, (DURUM[s.durum] || DURUM.teslim).ad));
+const musteriRaporu = s => pdfVer(() => O.musteriRaporuPdf(s));
 
 function ayarlar() {
   const d = B.durum;
@@ -712,6 +728,7 @@ const EYLEM = {
     else bildirim(`"${s.urunAd}" işleme alındı`);
   },
   'rapor-donem': d => { rapor.donem = d; ciz(); },
+  'musteri-rapor': id => { const s = st.satislar[id]; if (s) musteriRaporu({ ...s, musteriId: s.musteriId || M.musteriBul(s.musteri)?.id || '' }); },
   'rapor-pdf': () => {
     const [bas, bit, baslik] = R.donemAraligi(rapor);
     const r = R.raporHesap(st, bas, bit), ek = raporEkleri(bas, bit, r);
@@ -1221,7 +1238,7 @@ function satisDuzenle(id, on = {}) {
         <div style="flex:1"><b>Tanıtım stüdyosu</b><div class="soluk" id="foto-say" style="font-size:13px">Biten ürünün fotoğrafını ya da videosunu ekleyin; Instagram / WhatsApp için video ve görseller hazırlansın.</div></div>
         <button class="btn ana kucuk" data-k="studyo">Aç</button></div>`
       : '<p class="ipucu">Satışı kaydettikten sonra ürün fotoğrafı ekleyip tanıtım videosu hazırlayabilirsiniz.</p>'}</div>
-    <div class="bolum btn-satir"><button class="btn" data-k="teklif">🧾 Fiyat teklifi</button><button class="btn" data-k="fis">🧾 Sipariş fişi</button><button class="btn" data-k="pdf">📄 İş raporu (PDF)</button>
+    <div class="bolum btn-satir"><button class="btn" data-k="teklif">🧾 Fiyat teklifi</button><button class="btn" data-k="fis">🧾 Sipariş fişi</button>${eski ? '<button class="btn" data-k="musteri-rapor">🎁 Müşteri teslim raporu</button>' : ''}<button class="btn" data-k="pdf">📄 İş raporu (PDF)</button>
       ${eski ? `<button class="btn tehlike" data-k="sil">Satışı sil</button>` : ''}</div>`,
     kaydet: () => {
       s.urunAd = (s.urunAd || '').trim();
@@ -1413,6 +1430,10 @@ function satisDuzenle(id, on = {}) {
       }
       case 'pdf':
         isRaporu(s);
+        break;
+      case 'musteri-rapor':
+        s.musteriId = M.musteriBul(s.musteri)?.id || s.musteriId || '';
+        musteriRaporu({ ...s, id });
         break;
       case 'sil':
         if (satisSil(id)) d.close();

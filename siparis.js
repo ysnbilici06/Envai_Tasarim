@@ -4,6 +4,7 @@ import * as S from './store.js';
 import { para, sayi, satisHesap } from './hesap.js';
 import { pdfUret, tarihSaatYaz, ustTarihSaat, yerelTarih, dokumOlustur } from './rapor.js';
 import { esc, r2 } from './ui.js';
+import * as D from './dosyadepo.js';
 
 const st = S.st;
 
@@ -135,4 +136,111 @@ export function fisPdf(s, tur = 'fis') {
   <div class="rp-sonuc">${teklif ? 'İlginiz için teşekkür ederiz. El yapımı ürünlerimiz siparişe özel hazırlanır.' : 'Siparişiniz için teşekkür ederiz! Ürününüz özenle, elde hazırlanmaktadır.'}</div>`;
   const ad = (teklif ? 'Teklif-' : 'Siparis-fisi-') + (m?.ad || s.musteri || s.urunAd || 'musteri').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '-').slice(0, 40);
   return pdfUret(govde, ad + '.pdf');
+}
+
+// ---------------------------------------------------------------- müşteri teslim raporu PDF
+/** Raporun ortasına konacak ürün görseli: stüdyoda üretilen (önce logolu vitrin, kare/dikey),
+ *  yoksa çekilen fotoğraf. data URL döner (html2canvas güvenle çizsin). */
+async function urunGorseli(satisId) {
+  const sahip = 'satis:' + satisId;
+  const resim = x => !(x.blob?.type || '').startsWith('video');
+  const uretilen = (await D.liste(sahip, 'uretilen').catch(() => [])).filter(resim);
+  const puan = x => (/vitrin/.test(x.ad) ? 4 : 0) + (/-kare-/.test(x.ad) ? 2 : /-dikey-/.test(x.ad) ? 1 : 0);
+  const sec = uretilen.sort((a, b) => puan(b) - puan(a) || a.eklendi - b.eklendi)[0]
+    || (await D.liste(sahip, 'urun').catch(() => [])).filter(resim)[0];
+  if (!sec) return null;
+  const url = await new Promise((ok, hata) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = hata; r.readAsDataURL(sec.blob); });
+  const img = await new Promise((ok, hata) => { const i = new Image(); i.onload = () => ok(i); i.onerror = hata; i.src = url; });
+  return { url, w: img.naturalWidth, h: img.naturalHeight };
+}
+
+/** Sipariş bitince müşteriye gönderilecek bilgilendirme raporu: ürün görseli ortada,
+ *  fiyat, sipariş / teslim tarihi, müşteri bilgileri. */
+export async function musteriRaporuPdf(s) {
+  const m = (s.musteriId && st.musteriler[s.musteriId]) || Object.values(st.musteriler).find(x => x.ad && x.ad === s.musteri) || null;
+  const h = satisHesap(s), o = odemeDurumu(s), z = s.zaman || {};
+  const gorsel = await urunGorseli(s.id);
+  // Görseli sayfanın ortasına sığdır (html2canvas object-fit desteklemiyor: ölçü elle)
+  let resimHtml = '';
+  if (gorsel) {
+    const enW = 540, enH = 360, o2 = Math.min(enW / gorsel.w, enH / gorsel.h);
+    resimHtml = `<div class="rp-blok mr-gorsel"><img src="${gorsel.url}" width="${Math.round(gorsel.w * o2)}" height="${Math.round(gorsel.h * o2)}" alt=""></div>`;
+  }
+  const siparisT = z.alindi || (s.tarih ? s.tarih + (s.saat ? 'T' + s.saat : '') : '');
+  const teslimT = z.teslim || z.bitti || s.teslimTarihi || '';
+  const ig = m?.instagram ? '@' + m.instagram.replace(/^@/, '') : (/^@/.test(s.musteri || '') ? s.musteri : '');
+  const musteriSatir = [
+    ['Ad soyad', m?.ad || (s.musteri || '').replace(/^@/, '')], ['Telefon', m?.telefon], ['Adres', m?.adres],
+    ['Instagram', ig], ['Diğer sosyal medya', m?.sosyal],
+  ].filter(([, v]) => v && String(v).trim());
+  const dukkan = [st.ayar.instagram && 'Instagram: @' + st.ayar.instagram.replace(/^@/, ''), st.ayar.whatsapp && 'WhatsApp: ' + st.ayar.whatsapp].filter(Boolean);
+  const kart = (e, d, alt = '') => `<div class="rp-kartcik"><div class="e">${e}</div><div class="d">${d}</div>${alt ? `<div class="e">${alt}</div>` : ''}</div>`;
+  const ad = m?.ad || (s.musteri || '').replace(/^@/, '');
+  const no = (s.id || '').slice(-6).toLocaleUpperCase('tr');
+  const igDukkan = st.ayar.instagram ? '@' + st.ayar.instagram.replace(/^@/, '') : '@envai_tasarim';
+  // Kurumsal görünüm: amblem + ENVAİ TASARIM yazısı (lacivert, logodaki gibi), logo renklerinde ince şerit
+  const govde = `
+  <style>
+    .rp .mr-antet { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 2px 0 12px; }
+    .rp .mr-marka { display: flex; align-items: center; gap: 14px; }
+    .rp .mr-marka img { width: 66px; height: 66px; display: block; }
+    .rp .mr-ad { font-family: "Poppins", "Inter", sans-serif; color: #1b2b52; line-height: 1; }
+    .rp .mr-ad b { display: block; font-size: 30px; font-weight: 700; letter-spacing: 4px; }
+    .rp .mr-ad span { display: block; font-size: 13px; font-weight: 500; letter-spacing: 9.5px; margin-top: 5px; }
+    .rp .mr-ad small { display: block; font-family: "Inter", sans-serif; font-size: 10.5px; letter-spacing: .4px; color: #6b6f8c; margin-top: 7px; font-weight: 500; }
+    .rp .mr-belge { text-align: right; }
+    .rp .mr-belge .t { font-family: "Poppins", sans-serif; font-size: 15px; font-weight: 700; color: #6d3fe0; letter-spacing: 2px; }
+    .rp .mr-belge div { font-size: 11px; color: #6b6f8c; margin-top: 3px; }
+    .rp .mr-serit { height: 5px; border-radius: 3px; margin-bottom: 16px;
+      background: linear-gradient(90deg, #2bb3c0 0%, #2bb3c0 20%, #e2457a 20%, #e2457a 40%, #f08a4b 40%, #f08a4b 60%, #e3a82b 60%, #e3a82b 80%, #1b2b52 80%, #1b2b52 100%); }
+    .rp .mr-baslik { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+    .rp .mr-baslik h1 { font-size: 21px; margin: 0; color: #1c1a3a; }
+    .rp .mr-baslik span { color: #6b6f8c; font-size: 12px; }
+    .rp .mr-selam { margin: 0 0 12px; padding: 10px 14px; border-radius: 10px; background: #f1effc; color: #3b2a7a; font-size: 13px; }
+    .rp .mr-gorsel { display: flex; justify-content: center; margin: 2px 0 14px; }
+    .rp .mr-gorsel img { border-radius: 14px; box-shadow: 0 6px 24px rgba(28,26,58,.18); display: block; border: 1px solid #ece9f8; }
+    .rp .rp-kartcik .d { font-size: 14px; }
+    .rp .mr-tesekkur { margin-top: 16px; display: flex; gap: 16px; align-items: center; padding: 14px 18px; border-radius: 12px;
+      background: linear-gradient(135deg, #f4f0ff, #fdf2f6); border: 1px solid #e6defa; }
+    .rp .mr-tesekkur img { width: 54px; height: 54px; flex-shrink: 0; }
+    .rp .mr-tesekkur h4 { margin: 0 0 4px; font-family: "Poppins", sans-serif; font-size: 15px; color: #1b2b52; }
+    .rp .mr-tesekkur p { margin: 0; font-size: 12px; color: #3d3a5c; line-height: 1.5; }
+    .rp .mr-imza { margin-top: 6px !important; font-style: italic; color: #6d3fe0 !important; font-weight: 600; }
+    .rp .mr-alt { margin-top: 8px; padding-top: 7px; border-top: 1px solid #e6defa; display: flex; gap: 18px; font-size: 11px; color: #6b6f8c; }
+    .rp .mr-alt b { color: #1b2b52; }
+  </style>
+  <div class="mr-antet rp-blok">
+    <div class="mr-marka"><img src="logo/envai-amblem.png" alt="">
+      <div class="mr-ad"><b>ENVAİ</b><span>TASARIM</span><small>El yapımı · Kişiye özel nakış ve dikiş</small></div></div>
+    <div class="mr-belge"><div class="t">TESLİM RAPORU</div>${no ? `<div>Sipariş no: <b>${esc(no)}</b></div>` : ''}<div>Düzenlenme: ${ustTarihSaat().tarih}</div></div>
+  </div>
+  <div class="mr-serit"></div>
+  <div class="mr-baslik rp-blok"><h1>${esc(s.urunAd || 'Özel iş')}</h1><span>${esc([s.kategori, `${sayi(s.adet || 1)} adet`].filter(Boolean).join(' · '))}</span></div>
+  <div class="mr-selam">${ad ? `Sayın <b>${esc(ad)}</b>, ` : ''}siparişiniz özenle hazırlandı${s.durum === 'teslim' ? ' ve teslim edildi' : ' ve teslime hazır'}. Bilgileri aşağıda bulabilirsiniz.</div>
+  ${resimHtml}
+  <div class="rp-kartlar">
+    ${kart('Ürün fiyatı', para(h.ciro), (s.adet || 1) > 1 ? `${sayi(s.adet)} × ${para(s.birimFiyat || 0)}` : '')}
+    ${kart('Sipariş tarihi', esc(tarihSaatYaz(siparisT)))}
+    ${kart(z.teslim ? 'Teslim tarihi' : 'Teslim (planlanan)', esc(tarihSaatYaz(teslimT)))}
+    ${kart('Ödeme', o.kalan > 0 ? `<span class="negatif">Kalan ${para(o.kalan)}</span>` : '<span class="pozitif">Ödendi</span>', o.kalan > 0 && o.tahsil ? 'Ödenen ' + para(o.tahsil) : '')}
+  </div>
+  <div class="rp-iki">
+    <div class="rp-blok"><h3>Müşteri bilgileri</h3>
+      <table class="tablo"><tbody>${musteriSatir.map(([k, v]) => `<tr><td>${k}</td><td><b>${esc(v)}</b></td></tr>`).join('') || '<tr><td><small>Müşteri bilgisi girilmemiş</small></td></tr>'}</tbody></table></div>
+    <div class="rp-blok"><h3>Ürün</h3>
+      <table class="tablo"><tbody>
+        <tr><td>Ürün</td><td><b>${esc(s.urunAd || 'Özel iş')}</b></td></tr>
+        ${s.urunTanim ? `<tr><td>Açıklama</td><td>${esc(s.urunTanim)}</td></tr>` : ''}
+        <tr><td>Adet</td><td>${sayi(s.adet || 1)}</td></tr>
+        <tr><td>Birim fiyat</td><td>${para(s.birimFiyat || 0)}</td></tr>
+      </tbody></table></div>
+  </div>
+  <div class="mr-tesekkur rp-blok"><img src="logo/envai-amblem.png" alt="">
+    <div><h4>Bizi tercih ettiğiniz için teşekkür ederiz!</h4>
+      <p>Ürününüz el emeğiyle, ilmek ilmek özenle hazırlandı; güzel günlerde kullanmanızı dileriz. Memnuniyetiniz bizim için en büyük ödül:
+        görüşlerinizi bizimle paylaşır, ürününüzün fotoğrafını Instagram'da <b>${esc(igDukkan)}</b> etiketiyle paylaşırsanız çok mutlu oluruz.</p>
+      <p class="mr-imza">Sevgiyle, Envai Tasarım</p>
+      <div class="mr-alt">${dukkan.map(x => { const [k, v] = x.split(': '); return `<span>${esc(k)}: <b>${esc(v)}</b></span>`; }).join('')}<span>Yeni siparişleriniz için bize her zaman yazabilirsiniz</span></div></div></div>`;
+  const dosya = 'Teslim-raporu-' + (ad || s.urunAd || 'musteri').replace(/[\/:*?"<>|@]+/g, '').replace(/\s+/g, '-').slice(0, 40);
+  return pdfUret(govde, dosya + '.pdf');
 }
