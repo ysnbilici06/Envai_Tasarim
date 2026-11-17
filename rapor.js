@@ -328,12 +328,8 @@ export async function pdfUret(govdeHtml, dosyaAdi) {
       g.drawImage(canvas, 0, y0 * OLCEK, canvas.width, h * OLCEK, 0, UST * OLCEK, canvas.width, h * OLCEK);
       if (i) pdf.addPage();
       pdf.addImage(c.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, 210, 297);
-      // Görsel sürüm: sayfanın boş alt kısmı kırpılır (telefonda sohbet içinde daha büyük görünür)
-      const k = document.createElement('canvas');
-      k.width = c.width; k.height = Math.min(c.height, (UST + h + 36) * OLCEK);
-      k.getContext('2d').drawImage(c, 0, 0);
-      gorseller.push(await new Promise(ok => k.toBlob(ok, 'image/jpeg', 0.92)));
-      k.width = k.height = 0;
+      // Görsel sürüm: tam A4 sayfa (kırpılmaz; arkadaki logo filigranı bütün görünsün — kullanıcı isteği)
+      gorseller.push(await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.92)));
       pdf.setFontSize(8); pdf.setTextColor(150);
       pdf.text(`EnvaiTasarim  -  ${i + 1} / ${sayfaSay}`, 105, 297 - mm(22), { align: 'center' });
     }
