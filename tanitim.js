@@ -479,11 +479,14 @@ export function ozellikOner(kategori = '', ad = '') {
   return m ? [...m[1]] : ['El yapımı', 'Kişiye özel', 'Özenle hazırlandı'];
 }
 
-export function paylasimMetni({ baslik, kategori = '', ozellikler = [], fiyat, instagram, whatsapp }) {
+export function paylasimMetni({ baslik, kategori = '', ozellikler = [], fiyat, instagram, whatsapp, aciklama = '', ekEtiket = [] }) {
   const etiket = new Set(['#envai_tasarim', '#envaitasarim', '#elyapımı', '#handmade', '#tasarım']);
   for (const [r, e] of ETIKETLER) if (r.test(kategori + ' ' + baslik)) e.forEach(x => etiket.add(x));
+  ekEtiket.forEach(x => etiket.add(x));
   return [
     `✨ ${baslik} ✨`,
+    '',
+    aciklama.trim(),
     '',
     ...ozellikler.filter(Boolean).map(o => `🧵 ${o}`),
     fiyat ? `💰 ${fiyat}` : '',

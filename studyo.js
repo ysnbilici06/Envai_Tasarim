@@ -3,6 +3,7 @@
 import * as S from './store.js';
 import * as D from './dosyadepo.js';
 import * as T from './tanitim.js';
+import * as AI from './analiz.js';
 import { para } from './hesap.js';
 import { $, $$, esc, bildirim, sayfaAc, dosyaPaylas, dosyaIndir, metinKopyala, SVG_ARTI } from './ui.js';
 
@@ -25,7 +26,10 @@ export async function tanitimStudyosu(s) {
     fiyat: para(s.birimFiyat || u?.satisFiyati || 0),
     instagram: ayar.instagram || 'envai_tasarim', whatsapp: ayar.whatsapp || '',
     cagri: "Sipariş için DM'den yaz 📩",
+    aciklama: '', ekEtiket: [],
   };
+  // Fotoğraf analizi (analiz.js): elle = kullanıcı metinleri kendisi değiştirdi (otomatik üzerine yazılmaz)
+  const ai = { hal: 'bos', oran: 0, sonuc: null, urunK: '', motifK: '', elle: false, sira: 0, imza: '' };
   let fotolar = [];      // { id, blob, url, bmp | video, duzenli }
   let logo = null;
   try { logo = await T.resimYukle('logo/envai-amblem.png'); } catch { }
@@ -49,6 +53,7 @@ export async function tanitimStudyosu(s) {
           <label class="btn ana tam" style="margin-top:8px">${SVG_ARTI} Fotoğraf / video çek ya da ekle
             <input type="file" accept="image/*,video/*" multiple hidden id="foto-ekle"></label>
           <label class="alan tik" style="margin-top:8px"><input type="checkbox" name="duzenle" ${durum.duzenle ? 'checked' : ''}> ✨ Fotoğrafları otomatik düzenle <small class="soluk">(ışık, renk, netlik)</small></label>
+          <div class="ai-kart" id="ai-kart" hidden></div>
         </div>
         <div class="bolum"><h3>2. Video</h3>
           <div class="segment" id="stil">${Object.entries(T.STILLER).map(([k, ad]) => `<button type="button" data-stil="${k}" class="${k === durum.stil ? 'aktif' : ''}">${ad.split(' · ')[0]}<small>${ad.split(' · ')[1]}</small></button>`).join('')}</div>
@@ -58,7 +63,7 @@ export async function tanitimStudyosu(s) {
             <input name="kanca" list="dl-kanca" value="${esc(durum.kanca)}" placeholder="İzleyeni durduracak ilk cümle">
             <datalist id="dl-kanca">${kancalar.map(k => `<option value="${esc(k)}">`).join('')}</datalist></label>
           <label class="alan">Ürün adı<input name="baslik" value="${esc(durum.baslik)}"></label>
-          <div class="alan">Öne çıkan özellikler
+          <div class="alan" id="oz-alan">Öne çıkan özellikler
             ${durum.ozellikler.map((o, i) => `<input data-oz="${i}" value="${esc(o)}" style="margin-top:4px">`).join('')}</div>
           <div class="ikili">
             <label class="alan tik"><input type="checkbox" name="fiyatGoster"> Fiyatı göster</label>
@@ -69,6 +74,8 @@ export async function tanitimStudyosu(s) {
             <label class="alan">WhatsApp<input name="whatsapp" value="${esc(durum.whatsapp)}" placeholder="05xx xxx xx xx" inputmode="tel"></label>
           </div>
           <label class="alan">Kapanış cümlesi<input name="cagri" value="${esc(durum.cagri)}"></label>
+          <label class="alan">Reklam açıklaması <small class="soluk">paylaşım metninin başına eklenir</small>
+            <textarea name="aciklama" rows="3" placeholder="Fotoğraf eklenince AI burayı doldurur; dilediğiniz gibi değiştirin"></textarea></label>
         </div>
         <div class="bolum"><h3>3. Oluştur</h3>
           <div class="alan">Biçimler
@@ -102,7 +109,74 @@ export async function tanitimStudyosu(s) {
       <button type="button" class="sil-x" data-foto-sil="${f.id}" aria-label="Sil">×</button></div>`).join('')
       || '<p class="soluk" style="margin:0;font-size:14px">Henüz fotoğraf ya da video yok.</p>';
     yenidenKur();
+    // Fotoğraflar değiştiyse yeniden analiz et (ilk 3 fotoğrafa bakılır)
+    const imza = fotolar.slice(0, 3).map(f => f.id).join(',');
+    if (imza !== ai.imza) { ai.imza = imza; if (fotolar.length) aiAnaliz(); else { ai.hal = 'bos'; aiCiz(); } }
   }
+
+  // ---------------------------------------------------------------- AI fotoğraf analizi
+  async function aiAnaliz() {
+    const sira = ++ai.sira;
+    const indirilecek = !(await AI.modelHazirMi());
+    ai.hal = 'yukleniyor'; ai.oran = 0; ai.indir = indirilecek; aiCiz();
+    try {
+      const kaynak = fotolar.map(f => f.video || f.bmp).filter(k => (k.videoWidth || k.width) > 0);
+      const sonuc = await AI.analizEt(kaynak, o => { if (sira === ai.sira) { ai.oran = o; aiCiz(); } });
+      if (sira !== ai.sira || !d.isConnected) return;
+      ai.sonuc = sonuc; ai.urunK = sonuc.urun[0].k; ai.motifK = sonuc.motif[0].k; ai.hal = 'hazir';
+      if (!ai.elle) aiUygula(); else aiCiz();
+    } catch (err) {
+      console.error(err);
+      if (sira === ai.sira) { ai.hal = 'hata'; aiCiz(); }
+    }
+  }
+  function aiUygula() {
+    const o = AI.metinOner(ai.urunK, ai.motifK, ai.sonuc?.renk);
+    if (!o) return;
+    Object.assign(durum, { baslik: o.baslik, kanca: o.kancalar[0], ozellikler: o.ozellikler, aciklama: o.aciklama, ekEtiket: o.etiket });
+    ai.reklam = null;   // yeni ürün/desen → reklam yazıları yeniden hazırlanır
+    $('[name=baslik]', d).value = o.baslik;
+    $('[name=aciklama]', d).value = o.aciklama;
+    $('[name=kanca]', d).value = o.kancalar[0];
+    $('#dl-kanca', d).innerHTML = [...new Set([...o.kancalar, ...kancalar])].map(k => `<option value="${esc(k)}">`).join('');
+    $('#oz-alan', d).innerHTML = 'Öne çıkan özellikler' + o.ozellikler.map((x, i) => `<input data-oz="${i}" value="${esc(x)}" style="margin-top:4px">`).join('');
+    ai.elle = false;
+    aiCiz(); yenidenKur(); bas = performance.now();
+  }
+  function aiCiz() {
+    const el = $('#ai-kart', d);
+    if (!el) return;
+    el.hidden = ai.hal === 'bos';
+    if (ai.hal === 'yukleniyor') {
+      el.innerHTML = `<div class="ai-baslik">🤖 <b>${ai.indir ? 'AI modeli indiriliyor' : 'Fotoğraf analiz ediliyor…'}</b></div>
+        ${ai.indir ? `<p class="ipucu" style="margin:4px 0">İlk sefere özel (~23 MB, Wi-Fi önerilir). Sonra internetsiz ve anında çalışır. Fotoğraf hiçbir yere gönderilmez.</p>` : ''}
+        <div class="ilerleme"><i style="width:${Math.round((ai.indir ? ai.oran : 0.6) * 100)}%"></i><span>${ai.indir ? '%' + Math.round(ai.oran * 100) : 'Ürün ve desen tanınıyor…'}</span></div>`;
+    } else if (ai.hal === 'hata') {
+      el.innerHTML = `<div class="ai-baslik">🤖 <b>AI analizi yapılamadı</b></div>
+        <p class="ipucu" style="margin:4px 0">İlk analiz için internet gerekir. Metinleri yine de elle yazabilirsiniz.</p>
+        <button type="button" class="btn kucuk" data-ai="tekrar">↻ Tekrar dene</button>`;
+    } else if (ai.hal === 'hazir') {
+      const s = ai.sonuc, u = AI.URUNLER[ai.urunK], o = AI.metinOner(ai.urunK, ai.motifK, s.renk);
+      const p = s.urun.find(x => x.k === ai.urunK)?.p || 0;
+      const emin = s.urun[0].p >= 0.45;
+      const motif = u.nakis && AI.MOTIFLER[ai.motifK]?.ad;
+      const urunCip = [...new Set([ai.urunK, ...s.urun.slice(0, 4).map(x => x.k)])].slice(0, 5);
+      el.innerHTML = `<div class="ai-baslik">🤖 <b>AI fotoğrafta gördü:</b> ${u.emoji} ${esc(u.ad)}${motif ? ' · ' + esc(motif) : ''}${s.renk ? ' · ' + esc(s.renk) + ' tonları' : ''}
+          <small class="soluk">%${Math.round(p * 100)}</small></div>
+        ${emin ? '' : '<p class="ipucu" style="margin:4px 0">Emin olamadım; doğru olanı aşağıdan seçin 👇</p>'}
+        <div class="ai-satir"><span class="soluk">Ürün</span><div class="cipler">${urunCip.map(k => `<button type="button" class="cip ${k === ai.urunK ? 'aktif' : ''}" data-ai-urun="${k}">${AI.URUNLER[k].emoji} ${esc(AI.URUNLER[k].ad)}</button>`).join('')}
+          <select data-ai-diger aria-label="Diğer ürün"><option value="">Diğer…</option>${Object.entries(AI.URUNLER).filter(([k]) => !urunCip.includes(k)).map(([k, x]) => `<option value="${k}">${esc(x.ad)}</option>`).join('')}</select></div></div>
+        ${u.nakis ? `<div class="ai-satir"><span class="soluk">Desen</span><div class="cipler">${[...new Set([ai.motifK, ...s.motif.slice(0, 3).map(x => x.k)])].map(k => `<button type="button" class="cip ${k === ai.motifK ? 'aktif' : ''}" data-ai-motif="${k}">${esc(AI.MOTIFLER[k].ad || 'belirgin desen yok')}</button>`).join('')}</div></div>` : ''}
+        <div class="alan" style="margin-top:6px">Hazır reklam yazıları <small class="soluk">istediğiniz gibi düzenleyebilirsiniz</small>
+          ${(ai.reklam ||= o.reklam).map((r, i) => `<div class="ai-reklam"><textarea rows="2" data-ai-reklam="${i}">${esc(r)}</textarea>
+            <div class="btn-satir"><button type="button" class="btn kucuk" data-ai-kopya="${i}">📋 Kopyala</button><button type="button" class="btn kucuk" data-ai-aciklama="${i}">⬇️ Açıklamaya yaz</button></div></div>`).join('')}</div>
+        <div class="btn-satir" style="margin-top:8px"><button type="button" class="btn ana kucuk" data-ai="uygula">✨ Metinleri forma yaz</button><button type="button" class="btn kucuk" data-ai="tekrar">↻ Yeniden analiz</button></div>
+        ${ai.elle ? '<p class="ipucu" style="margin:6px 0 0">Metinleri elle değiştirdiğiniz için forma otomatik yazılmadı.</p>' : ''}`;
+      $$('[data-ai-reklam]', el).forEach(boyutla);
+    }
+  }
+  // Yazı kutusu içeriği kadar uzasın
+  function boyutla(t) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; }
   $('#foto-ekle', d).addEventListener('change', async e => {
     const dosyalar = [...e.target.files];
     e.target.value = '';
@@ -126,7 +200,7 @@ export async function tanitimStudyosu(s) {
   const metinler = () => ({
     kanca: durum.kanca, baslik: durum.baslik, ozellikler: durum.ozellikler.filter(Boolean),
     fiyat: durum.fiyatGoster ? durum.fiyat : '', instagram: durum.instagram, whatsapp: durum.whatsapp,
-    cagri: durum.cagri, slogan: 'El yapımı · Kişiye özel',
+    cagri: durum.cagri, slogan: 'El yapımı · Kişiye özel', aciklama: durum.aciklama, ekEtiket: durum.ekEtiket,
   });
   // Kaynaklar: video olduğu gibi; fotoğraf istenirse otomatik düzenlenmiş hali (bir kez hesaplanır)
   const kaynaklar = () => fotolar.map(f => f.video || (durum.duzenle ? (f.duzenli ||= T.iyilestir(f.bmp)) : f.bmp));
@@ -161,6 +235,9 @@ export async function tanitimStudyosu(s) {
   let zaman;
   d.addEventListener('input', e => {
     const t = e.target;
+    if (t.dataset.aiReklam) { if (ai.reklam) ai.reklam[t.dataset.aiReklam] = t.value; boyutla(t); return; }
+    if (t.dataset.aiDiger !== undefined) { if (t.value) { ai.urunK = t.value; aiUygula(); } return; }
+    if (t.dataset.oz || ['kanca', 'baslik', 'cagri', 'aciklama'].includes(t.name)) { ai.elle = true; }
     if (t.dataset.oz) durum.ozellikler[t.dataset.oz] = t.value;
     else if (t.dataset.format) { t.checked ? durum.formatlar.add(t.dataset.format) : durum.formatlar.delete(t.dataset.format); return; }
     else if (t.name === 'fiyatGoster') durum.fiyatGoster = t.checked;
@@ -171,8 +248,20 @@ export async function tanitimStudyosu(s) {
   });
   const sec = (grup, deger, ozellik) => $$(`#${grup} [data-${ozellik}]`, d).forEach(b => b.classList.toggle('aktif', b.dataset[ozellik] === deger));
   d.addEventListener('click', async e => {
-    const t = e.target.closest('[data-oniz],[data-stil],[data-tema],[data-foto-sil],[data-k]');
+    const t = e.target.closest('[data-oniz],[data-stil],[data-tema],[data-foto-sil],[data-k],[data-ai],[data-ai-urun],[data-ai-motif],[data-ai-kopya],[data-ai-aciklama]');
     if (!t) return;
+    if (t.dataset.aiUrun) { ai.urunK = t.dataset.aiUrun; return aiUygula(); }
+    if (t.dataset.aiMotif) { ai.motifK = t.dataset.aiMotif; return aiUygula(); }
+    if (t.dataset.aiKopya) { if (await metinKopyala(ai.reklam?.[t.dataset.aiKopya] || '')) bildirim('Reklam yazısı kopyalandı'); return; }
+    if (t.dataset.aiAciklama) {
+      durum.aciklama = ai.reklam?.[t.dataset.aiAciklama] || ''; $('[name=aciklama]', d).value = durum.aciklama;
+      yenidenKur(); bildirim('Reklam açıklamasına yazıldı'); return;
+    }
+    if (t.dataset.ai === 'uygula') {
+      if (ai.elle && !confirm('Elle yaptığınız değişikliklerin yerine AI metinleri yazılsın mı?')) return;
+      return aiUygula();
+    }
+    if (t.dataset.ai === 'tekrar') return aiAnaliz();
     if (t.dataset.oniz) { durum.onizFormat = t.dataset.oniz; sec('oniz-format', t.dataset.oniz, 'oniz'); yenidenKur(); bas = performance.now(); return; }
     if (t.dataset.stil) {
       durum.stil = t.dataset.stil; sec('stil', durum.stil, 'stil');
