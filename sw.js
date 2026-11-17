@@ -1,5 +1,5 @@
 // Çevrimdışı çalışma: önce ağdan dene, olmazsa önbellekten ver.
-const ONBELLEK = 'envai-v23';
+const ONBELLEK = 'envai-v24';
 // AI kütüphanesi (jsdelivr, sürümü sabit) ayrı ve kalıcı önbellekte; model dosyalarını transformers.js kendisi saklar
 const AI_ONBELLEK = 'ai-kutuphane-v1';
 const DOSYALAR = ['./', 'index.html', 'style.css', 'app.js', 'store.js', 'hesap.js', 'bulut.js', 'ornek.js', 'rapor.js', 'ui.js', 'dosyadepo.js', 'tanitim.js', 'studyo.js', 'siparis.js', 'musteri.js', 'nakis.js', 'giderler.js', 'kilit.js', 'disari.js', 'bitenler.js', 'analiz.js', 'ai-etiketler.json', 'lib/mp4-muxer.min.js', 'lib/jspdf.umd.min.js', 'lib/html2canvas.min.js',

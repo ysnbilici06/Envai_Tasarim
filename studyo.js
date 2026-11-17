@@ -27,7 +27,8 @@ export async function tanitimStudyosu(s) {
   const ilk = adIpucu.urun ? AI.metinOner(adIpucu.urun, adIpucu.motif || 'duz', '', tanim) : null;
   const durum = {
     stil: ayar.tanitimStil || 'ugc', tema: ayar.tanitimTema || 'zarif', onizFormat: 'dikey',
-    formatlar: new Set(ayar.tanitimFormatlar || ['dikey', 'yatay']),
+    // Yalnızca dikey (Instagram Reels/Hikâye + WhatsApp durum): diğer boyutlar iPad'i boşuna yoruyordu (kullanıcı isteği)
+    formatlar: new Set(['dikey']),
     kanca: ilk ? ilk.kancalar[0] : T.kancaOner(s.kategori, s.urunAd)[0],
     baslik: s.urunAd || 'El yapımı tasarım',
     ozellikler: ilk ? ilk.ozellikler : T.ozellikOner(s.kategori, s.urunAd),
@@ -52,9 +53,7 @@ export async function tanitimStudyosu(s) {
     <div class="studyo">
       <div class="studyo-sol">
         <div class="oniz-kap"><canvas id="oniz"></canvas><div class="oniz-bos" id="oniz-bos">📷<br>Önce ürünün fotoğrafını ekleyin</div></div>
-        <div class="segment" id="oniz-format">
-          ${Object.entries(T.FORMATLAR).map(([k, f]) => `<button type="button" data-oniz="${k}" class="${k === durum.onizFormat ? 'aktif' : ''}">${f.ad.split(' · ')[0]}</button>`).join('')}
-        </div>
+        <p class="ipucu" style="text-align:center;margin:6px 0 0">📱 Dikey · Instagram ve WhatsApp için</p>
       </div>
       <div class="studyo-sag form">
         <div class="bolum" style="margin-top:0"><h3>1. Ürün fotoğrafı / videosu</h3>
@@ -92,8 +91,7 @@ export async function tanitimStudyosu(s) {
             <input name="etiketler" value="${esc(durum.etiketler)}" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
         </div>
         <div class="bolum"><h3>3. Oluştur</h3>
-          <div class="alan">Biçimler
-            <div class="bicimler">${Object.entries(T.FORMATLAR).map(([k, f]) => `<label class="tik"><input type="checkbox" data-format="${k}" ${durum.formatlar.has(k) ? 'checked' : ''}> ${f.ad}</label>`).join('')}</div></div>
+          <p class="ipucu" style="margin:0">Dikey (9:16) üretilir: Instagram Reels / Hikâye ve WhatsApp durumu için. Yeniden ürettiğinizde öncekiler silinir; Ürün Galerisi'nde yalnızca en son hali kalır.</p>
           <div class="btn-satir"><button class="btn ana" data-k="video">🎬 Video oluştur</button><button class="btn" data-k="gorsel">🖼️ Ürün görselleri</button></div>
           <div class="ilerleme" id="ilerleme" hidden><i></i><span></span></div>
           ${T.videoDestekli() ? '' : '<p class="ipucu negatif">Bu tarayıcı video üretemiyor; ürün görselleri yine de hazırlanabilir.</p>'}
@@ -347,6 +345,9 @@ export async function tanitimStudyosu(s) {
     if (!fotolar.length) return bildirim('Önce ürünün fotoğrafını ya da videosunu ekleyin');
     const formatlar = Object.keys(T.FORMATLAR).filter(f => durum.formatlar.has(f));
     if (!formatlar.length) return bildirim('En az bir biçim seçin');
+    const tip = tur === 'video' ? 'video' : 'uretilen';
+    const eskiler = await D.liste(sahip, tip).catch(() => []);
+    if (eskiler.length && !confirm(`Bu ürün için daha önce ${tur === 'video' ? 'video' : 'görsel'} üretilmiş. Yenisi üretilince eskiler silinsin ve galeride yalnızca en son hali kalsın mı?`)) return;
     S.ayarKaydet({ instagram: durum.instagram.replace(/^@/, ''), whatsapp: durum.whatsapp, tanitimStil: durum.stil, tanitimTema: durum.tema, tanitimFormatlar: formatlar, tanitimDuzenle: durum.duzenle });
     mesgul = true; $$('[data-k=video],[data-k=gorsel]', d).forEach(b => { b.disabled = true; });
     fotolar.forEach(f => f.video?.pause());
@@ -364,9 +365,10 @@ export async function tanitimStudyosu(s) {
           o => ilerlemeGoster(o, `Görseller hazırlanıyor… %${Math.round(o * 100)}`)));
       }
       sonucGoster(tur, dosyalar);
-      // Ürün Galerisi'ne kaydet
-      for (const f of dosyalar) await D.ekle(sahip, tur === 'video' ? 'video' : 'uretilen', f, f.name);
-      bildirim((tur === 'video' ? `${dosyalar.length} video hazır` : `${dosyalar.length} görsel hazır`) + " · Ürün Galerisi'ne eklendi");
+      // Ürün Galerisi: yalnızca en son üretilen kalır (yeni üretim başarılı olduktan SONRA eskiler silinir)
+      for (const f of dosyalar) await D.ekle(sahip, tip, f, f.name);
+      for (const x of eskiler) await D.sil(x.id);
+      bildirim((tur === 'video' ? `${dosyalar.length} video hazır` : `${dosyalar.length} görsel hazır`) + (eskiler.length ? ' · galerideki eskilerin yerine geçti' : " · Ürün Galerisi'ne eklendi"));
     } catch (err) {
       console.error(err);
       bildirim(tur === 'video' ? 'Video oluşturulamadı' : 'Görseller oluşturulamadı');
@@ -404,6 +406,9 @@ export async function tanitimStudyosu(s) {
       else if (navigator.canShare?.({ files: dosyalar })) { try { await navigator.share({ files: dosyalar }); } catch { } }
       else dosyalar.forEach((f, i) => setTimeout(() => dosyaIndir(f), i * 350));
     });
+    // Aynı türün önceki sonucu ekrandan da kalkar: yalnızca en son üretilen görünür
+    kap.dataset.tur = tur;
+    $$(`#sonuclar .sonuc-kart[data-tur="${tur}"]`, d).forEach(x => x.remove());
     $('#sonuclar', d).prepend(kap);
     kap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
