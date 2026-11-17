@@ -80,3 +80,49 @@ export async function metinKopyala(metin) {
     const ok = document.execCommand('copy'); t.remove(); return ok;
   }
 }
+
+/**
+ * Tam ekran önizleme: ogeler = [{ url, video?: bool, dosya?: File }], i = açılacak sıra.
+ * Görseller arasında oklarla ya da kaydırarak geçilir; Paylaş / İndir düğmeleri seçili dosyaya uygulanır.
+ */
+export function medyaGoster(ogeler, i = 0) {
+  const d = document.createElement('dialog');
+  d.className = 'medya-bak';
+  const coklu = ogeler.length > 1;
+  d.innerHTML = `<div class="mb-sahne"></div>
+    <button type="button" class="mb-kapat" data-mb="kapat" aria-label="Kapat">×</button>
+    ${coklu ? '<button type="button" class="mb-ok sol" data-mb="geri" aria-label="Önceki">‹</button><button type="button" class="mb-ok sag" data-mb="ileri" aria-label="Sonraki">›</button>' : ''}
+    <div class="mb-alt"><span class="mb-sira"></span>
+      <button type="button" class="btn ana kucuk" data-mb="paylas">Paylaş</button><button type="button" class="btn kucuk" data-mb="indir">İndir</button></div>`;
+  const sahne = d.querySelector('.mb-sahne');
+  const goster = () => {
+    const o = ogeler[i];
+    sahne.innerHTML = o.video ? `<video src="${o.url}" controls autoplay playsinline loop></video>` : `<img src="${o.url}" alt="">`;
+    d.querySelector('.mb-sira').textContent = coklu ? `${i + 1} / ${ogeler.length}` : '';
+    d.querySelectorAll('[data-mb=paylas],[data-mb=indir]').forEach(b => { b.hidden = !o.dosya; });
+  };
+  const git = n => { i = (i + n + ogeler.length) % ogeler.length; goster(); };
+  d.addEventListener('click', async e => {
+    const t = e.target.closest('[data-mb]');
+    if (!t) { if (e.target === d || e.target === sahne) d.close(); return; }
+    const o = ogeler[i];
+    if (t.dataset.mb === 'kapat') d.close();
+    else if (t.dataset.mb === 'geri') git(-1);
+    else if (t.dataset.mb === 'ileri') git(1);
+    else if (t.dataset.mb === 'paylas') await dosyaPaylas(o.dosya);
+    else if (t.dataset.mb === 'indir') dosyaIndir(o.dosya);
+  });
+  let x0 = null;
+  sahne.addEventListener('touchstart', e => { x0 = e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
+  sahne.addEventListener('touchend', e => {
+    if (x0 == null || !coklu || ogeler[i].video) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    if (Math.abs(dx) > 50) git(dx < 0 ? 1 : -1);
+  });
+  d.addEventListener('keydown', e => { if (coklu && e.key === 'ArrowRight') git(1); if (coklu && e.key === 'ArrowLeft') git(-1); });
+  d.addEventListener('close', () => { sahne.querySelector('video')?.pause(); d.remove(); });
+  document.body.append(d);
+  goster();
+  d.showModal();
+  return d;
+}

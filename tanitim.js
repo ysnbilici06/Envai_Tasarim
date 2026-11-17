@@ -479,10 +479,17 @@ export function ozellikOner(kategori = '', ad = '') {
   return m ? [...m[1]] : ['El yapımı', 'Kişiye özel', 'Özenle hazırlandı'];
 }
 
-export function paylasimMetni({ baslik, kategori = '', ozellikler = [], fiyat, instagram, whatsapp, aciklama = '', ekEtiket = [] }) {
-  const etiket = new Set(['#envai_tasarim', '#envaitasarim', '#elyapımı', '#handmade', '#tasarım']);
+/** Kategoriye göre 5 hashtag (AI sonucu yokken kullanılır). */
+export function etiketlerOner(kategori = '', baslik = '') {
+  const etiket = new Set();
   for (const [r, e] of ETIKETLER) if (r.test(kategori + ' ' + baslik)) e.forEach(x => etiket.add(x));
-  ekEtiket.forEach(x => etiket.add(x));
+  ['#elyapımı', '#kişiyeözel', '#handmade', '#elemeği'].forEach(x => etiket.add(x));
+  return [...etiket].slice(0, 5).join(' ');
+}
+
+export function paylasimMetni({ baslik, kategori = '', ozellikler = [], fiyat, instagram, whatsapp, aciklama = '', etiketler = '' }) {
+  const etiket = (etiketler || etiketlerOner(kategori, baslik)).split(/\s+/).filter(Boolean)
+    .map(x => x.startsWith('#') ? x : '#' + x);
   return [
     `✨ ${baslik} ✨`,
     '',

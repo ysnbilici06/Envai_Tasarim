@@ -13,8 +13,7 @@ function hazirla(ilerle) {
     const tf = await import(KUTUPHANE);
     tf.env.allowLocalModels = false;
     const yuk = {};
-    const [islemci, model, etiket] = await Promise.all([
-      tf.AutoProcessor.from_pretrained(MODEL),
+    const [model, etiket] = await Promise.all([
       // fp16: sıkıştırılmış (q8) sürüm ürünleri ayırt edemiyor, fp16 doğru sonuç veriyor
       tf.CLIPVisionModelWithProjection.from_pretrained(MODEL, {
         dtype: 'fp16',
@@ -28,7 +27,7 @@ function hazirla(ilerle) {
       }),
       fetch('ai-etiketler.json').then(r => { if (!r.ok) throw new Error('etiketler'); return r.json(); }),
     ]);
-    return { tf, islemci, model, etiket };
+    return { tf, model, etiket };
   })();
   hazirlik.ilerle = ilerle;
   hazirlik.catch(() => { hazirlik = null; });   // hata olursa sonraki denemede yeniden
@@ -88,21 +87,39 @@ function sirala(v, siniflar) {
  * Dönüş: { urun:[{k,p}...], motif:[{k,p}...], renk }
  */
 export async function analizEt(kaynaklar, ilerle) {
-  const { tf, islemci, model, etiket } = await hazirla(ilerle);
+  const { tf, model, etiket } = await hazirla(ilerle);
   let toplam = null, renk = '';
   for (const [i, k] of kaynaklar.slice(0, 3).entries()) {
-    const { c, g } = tuvale(k);
-    if (i === 0) renk = baskinRenk(g, c.width, c.height);
-    const id = g.getImageData(0, 0, c.width, c.height);
-    const resim = new tf.RawImage(new Uint8ClampedArray(id.data), c.width, c.height, 4).rgb();
-    const { image_embeds } = await model(await islemci(resim));
+    if (i === 0) { const { c, g } = tuvale(k); renk = baskinRenk(g, c.width, c.height); c.width = c.height = 0; }
+    const pv = new tf.Tensor('float32', pikseller(k), [1, 3, BOYUT, BOYUT]);
+    const { image_embeds } = await model({ pixel_values: pv });
     const v = norm(Array.from(image_embeds.data));
     toplam = toplam ? toplam.map((x, j) => x + v[j]) : v;
-    c.width = c.height = 0;
   }
   if (!toplam) throw new Error('fotoğraf yok');
   const v = norm(toplam);
   return { urun: sirala(v, etiket.urun), motif: sirala(v, etiket.motif), renk };
+}
+
+// Modelin beklediği girdi (preprocessor_config): kısa kenar 256'ya küçült, ortadan 256×256 kırp,
+// 0..1 aralığı, CHW. Kütüphanenin kendi küçültmesi OffscreenCanvas istiyor (bazı WebKit
+// sürümlerinde yok), bu yüzden normal canvas ile burada yapılıyor.
+const BOYUT = 256;
+function pikseller(kaynak) {
+  const w = kaynak.videoWidth || kaynak.width, h = kaynak.videoHeight || kaynak.height;
+  const kenar = Math.min(w, h);
+  const c = document.createElement('canvas');
+  c.width = c.height = BOYUT;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.drawImage(kaynak, (w - kenar) / 2, (h - kenar) / 2, kenar, kenar, 0, 0, BOYUT, BOYUT);
+  const { data } = g.getImageData(0, 0, BOYUT, BOYUT);
+  c.width = c.height = 0;
+  const n = BOYUT * BOYUT, out = new Float32Array(3 * n);
+  for (let j = 0; j < n; j++) {
+    out[j] = data[j * 4] / 255; out[n + j] = data[j * 4 + 1] / 255; out[2 * n + j] = data[j * 4 + 2] / 255;
+  }
+  return out;
 }
 
 /** Model daha önce indirildi mi? (indirme uyarısı için) */
@@ -376,5 +393,46 @@ export function metinOner(urunK, motifK, renk = '') {
     `Müşteri isteği üzerine hazırladım 😍 ${baslik} ${u.emoji} Güzel günlerde kullanılsın ❤️ Siparişleriniz ve bilgi için DM 📩`,
     u.nakis ? 'Baskı değil, nakış! 🪡 İlmek ilmek işlendiği için yıkamada solmaz, çıkmaz; yıllarca ilk günkü gibi kalır ✨' : 'Temiz işçilik, zamanında teslim ✂️ Atölyemizde her iş tek tek, özenle hazırlanır 🤍',
   ];
-  return { baslik, kancalar: [...new Set(kancalar)], ozellikler, aciklama, reklam, etiket: u.etiket };
+  return { baslik, kancalar: [...new Set(kancalar)], ozellikler, aciklama, reklam, etiket: etiketOner(urunK, motifK) };
+}
+
+// ================================================================ ürün adından tahmin
+// Kullanıcının yazdığı ürün adı en güvenilir ipucudur ("yastık üzerine nakış" → yastık kılıfı).
+// Sıra önemli: özel olanlar genel olanlardan önce.
+const AD_URUN = [
+  ['hastane', /hastane|çıkış seti/], ['battaniye', /battaniye|pike/], ['kina', /kına/],
+  ['gelinlik', /gelinlik|abiye|nişanlık/], ['bohca', /bohça|hurç|çeyiz seti/], ['ibadet', /kur.?an|tesbih|tespih|kese/],
+  ['seccade', /seccade|namazlak/], ['koltuk', /koltuk|kanepe/], ['yastik', /yastık|kırlent/],
+  ['havlu', /havlu/], ['bornoz', /bornoz/], ['bebek', /bebek|zıbın|tulum|salopet/],
+  ['canta_ip', /kağıt ?ip|örgü çanta|ip çanta/], ['canta_bez', /çanta|tote/], ['gelinlik', /düğün/],
+  ['elbise', /elbise|etek|kıyafet dikim/], ['pantolon', /paça|pantolon|kot\b/], ['onluk', /önlük/],
+  ['ust_giyim', /tişört|t-shirt|tshirt|sweat|hırka|gömlek|kazak|ceket|polo/], ['mendil', /mendil/],
+  ['nevresim', /nevresim|çarşaf|yatak örtü/], ['masa', /masa|runner|sofra/], ['anahtarlik', /anahtarlık|charm/],
+  ['toka', /toka|fiyonk/], ['kahve', /kahve|fincan|tepsi/], ['kasnak', /kasnak|pano/], ['sapka', /şapka|bere/],
+  ['patch', /logo|arma\b|patch|kurumsal/], ['perde', /perde/], ['makine', /makine/],
+  ['dikis', /tadilat|dikiş|fermuar|daralt|tamir/],
+];
+const AD_MOTIF = [
+  ['kabe', /kabe/], ['kalp', /kalp/], ['logo', /logo|arma\b/], ['monogram', /harf|monogram/],
+  ['cicek', /çiçek|gül|lale|papatya|lavanta/], ['dantel', /dantel/], ['figur', /ayıcık|tavşan|figür|karakter/],
+  ['geleneksel', /motif|geleneksel|yöresel/], ['isim', /isim|isimli|ad\b/],
+];
+/** Serbest metinden (ürün adı, kategori) ürün ve desen anahtarı tahmin eder. */
+export function adTahmin(metin = '') {
+  const k = metin.toLocaleLowerCase('tr');
+  return { urun: AD_URUN.find(([, r]) => r.test(k))?.[0] || '', motif: AD_MOTIF.find(([, r]) => r.test(k))?.[0] || '' };
+}
+
+// ================================================================ hashtag (5 adet)
+const MOTIF_ETIKET = {
+  isim: '#isimnakışı', cicek: '#çiçeknakışı', figur: '#nakışfigür', monogram: '#monogram', geleneksel: '#motifnakış',
+  kabe: '#kabenakışı', kalp: '#kalpnakışı', logo: '#logonakışı', dantel: '#dantel',
+};
+/** Ürüne ve yapılan işe göre en fazla 5 hashtag (Instagram artık 3–5 hashtag öneriyor). */
+export function etiketOner(urunK, motifK) {
+  const u = URUNLER[urunK];
+  if (!u) return ['#elyapımı', '#kişiyeözel', '#handmade', '#nakış', '#hediye'];
+  const m = u.nakis ? MOTIF_ETIKET[motifK] : '';
+  const yedek = u.nakis ? ['#kişiyeözel', '#nakışişleme', '#elemeği', '#hediyelik'] : ['#elemeği', '#özeldikim', '#terzi', '#elyapımı'];
+  return [...new Set([...u.etiket.slice(0, m ? 3 : 4), m, ...yedek].filter(Boolean))].slice(0, 5);
 }
