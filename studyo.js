@@ -39,7 +39,7 @@ export async function tanitimStudyosu(s) {
     etiketler: ilk ? ilk.etiket.join(' ') : T.etiketlerOner(s.kategori, s.urunAd),
   };
   // Fotoğraf analizi (analiz.js): degisen = kullanıcının elle değiştirdiği alanlar (AI bunların üzerine yazmaz)
-  const ai = { hal: 'bos', oran: 0, sonuc: null, urunK: adIpucu.urun, motifK: adIpucu.motif || 'duz', degisen: new Set(), sira: 0, imza: '' };
+  const ai = { hal: 'bos', oran: 0, sonuc: null, urunK: adIpucu.urun, motifK: adIpucu.motif || 'duz', degisen: new Set(), sira: 0, imza: '', tur: 0 };
   let fotolar = [];      // { id, blob, url, bmp | video, duzenli }
   let logo = null;
   try { logo = await T.resimYukle('logo/envai-amblem.png'); } catch { }
@@ -129,13 +129,17 @@ export async function tanitimStudyosu(s) {
   }
 
   // ---------------------------------------------------------------- AI fotoğraf analizi
-  async function aiAnaliz() {
+  async function aiAnaliz(elle = false) {
     const sira = ++ai.sira;
     const indirilecek = !(await AI.modelHazirMi());
     ai.hal = 'yukleniyor'; ai.oran = 0; ai.indir = indirilecek; aiCiz();
+    if (elle) $('#ai-kart', d)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     try {
       const kaynak = fotolar.map(f => f.video || f.bmp).filter(k => (k.videoWidth || k.width) > 0);
-      const sonuc = await AI.analizEt(kaynak, o => { if (sira === ai.sira) { ai.oran = o; aiCiz(); } });
+      const [sonuc] = await Promise.all([
+        AI.analizEt(kaynak, o => { if (sira === ai.sira) { ai.oran = o; aiCiz(); } }),
+        new Promise(ok => setTimeout(ok, elle ? 900 : 0)),   // elle basıldığında analiz anlık bitse de görünsün
+      ]);
       if (sira !== ai.sira || !d.isConnected) return;
       ai.sonuc = sonuc; ai.hal = 'hazir';
       // Ürün adı bir ürünü açıkça söylüyorsa o seçilir; fotoğraf sonucu çiplerde kalır
@@ -148,20 +152,25 @@ export async function tanitimStudyosu(s) {
     }
   }
   /** AI metinlerini forma yazar. zorla değilse kullanıcının elle değiştirdiği alanlara dokunmaz. */
-  function aiUygula(zorla = false) {
+  function aiUygula(zorla = false, tur = 0) {
     const o = AI.metinOner(ai.urunK, ai.motifK, ai.sonuc?.renk, tanim);
     if (!o) return;
     if (zorla) ai.degisen.clear();
     const yaz = a => !ai.degisen.has(a);
-    ai.reklam = null;   // yeni ürün/desen → reklam yazıları yeniden hazırlanır
-    if (yaz('baslik')) { durum.baslik = o.baslik; $('[name=baslik]', d).value = o.baslik; }
-    if (yaz('aciklama')) { durum.aciklama = o.aciklama; $('[name=aciklama]', d).value = o.aciklama; }
-    if (yaz('kanca')) { durum.kanca = o.kancalar[0]; $('[name=kanca]', d).value = o.kancalar[0]; }
-    if (yaz('etiketler')) { durum.etiketler = o.etiket.join(' '); $('[name=etiketler]', d).value = durum.etiketler; }
+    // tur > 0: düğmeye tekrar basıldı → başka açılış cümlesi ve reklam sırası (aynı yazı yazılıp "çalışmıyor" sanılmasın)
+    const dondur = l => l.slice(tur % l.length).concat(l.slice(0, tur % l.length));
+    ai.reklam = tur ? dondur(o.reklam) : null;   // yeni ürün/desen → reklam yazıları yeniden hazırlanır
+    const parla = el => { el.classList.remove('ai-parla'); void el.offsetWidth; el.classList.add('ai-parla'); };
+    const koy = (ad, deger) => { durum[ad] = deger; const el = $(`[name=${ad}]`, d); el.value = deger; parla(el); };
+    if (yaz('baslik')) koy('baslik', o.baslik);
+    if (yaz('aciklama')) koy('aciklama', o.aciklama);
+    if (yaz('kanca')) koy('kanca', o.kancalar[tur % o.kancalar.length]);
+    if (yaz('etiketler')) koy('etiketler', o.etiket.join(' '));
     $('#dl-kanca', d).innerHTML = [...new Set([...o.kancalar, ...kancalar])].map(k => `<option value="${esc(k)}">`).join('');
     if (yaz('oz')) {
       durum.ozellikler = [...o.ozellikler];
       $('#oz-alan', d).innerHTML = 'Öne çıkan özellikler' + o.ozellikler.map((x, i) => `<input data-oz="${i}" value="${esc(x)}" style="margin-top:4px">`).join('');
+      $$('#oz-alan input', d).forEach(parla);
     }
     aiCiz(); yenidenKur(); bas = performance.now();
   }
@@ -300,9 +309,17 @@ export async function tanitimStudyosu(s) {
     }
     if (t.dataset.ai === 'uygula') {
       if (ai.degisen.size && !confirm('Elle yaptığınız değişikliklerin yerine AI metinleri yazılsın mı?')) return;
-      return aiUygula(true);
+      aiUygula(true, ++ai.tur);
+      return bildirim('✨ Metinler forma yazıldı (tekrar basarsanız başka açılış cümlesi gelir)');
     }
-    if (t.dataset.ai === 'tekrar') return aiAnaliz();
+    if (t.dataset.ai === 'tekrar') {
+      if (!fotolar.length) return bildirim('Önce ürün fotoğrafı ekleyin');
+      if (ai.degisen.size && !confirm('Fotoğraflar yeniden analiz edilip tüm metinler baştan yazılsın mı? (Elle yaptığınız değişiklikler silinir)')) return;
+      ai.degisen.clear(); ai.tur = 0;
+      await aiAnaliz(true);
+      if (ai.hal === 'hazir') bildirim('🤖 Fotoğraflar yeniden analiz edildi, metinler yenilendi');
+      return;
+    }
     if (t.dataset.oniz) { durum.onizFormat = t.dataset.oniz; sec('oniz-format', t.dataset.oniz, 'oniz'); yenidenKur(); bas = performance.now(); return; }
     if (t.dataset.stil) {
       durum.stil = t.dataset.stil; sec('stil', durum.stil, 'stil');

@@ -561,6 +561,9 @@ label.btn { display: inline-flex; align-items: center; justify-content: center; 
 .ai-satir .cipler { margin: 0; flex: 1; align-items: center; flex-wrap: wrap; overflow: visible; }
 .ai-satir select { width: auto; min-width: 96px; flex: none; padding: 6px 8px; font-size: 14px; }
 .ai-reklam { margin-top: 6px; }
+/* AI bir alanı doldurduğunda kısa bir mor parlama: değişiklik gözle görülsün */
+@keyframes aiParla { 0% { box-shadow: 0 0 0 3px rgba(124, 58, 237, .55); background-color: rgba(124, 58, 237, .12); } 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); } }
+.ai-parla { animation: aiParla 1.4s ease-out; }
 .ai-reklam textarea { width: 100%; font-size: 14px; line-height: 1.4; resize: none; overflow: hidden; min-height: 0; }
 .ai-reklam .btn-satir { margin-top: 4px; justify-content: flex-start; }
 .ai-reklam .btn-satir .btn { flex: none; width: auto; }
