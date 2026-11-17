@@ -17,8 +17,14 @@ export async function tanitimStudyosu(s) {
   const u = s.urunId ? st.urunler[s.urunId] : null;
   const ayar = st.ayar;
   // Ürün adından ipucu ("yastık üzerine nakış" → yastık kılıfı): fotoğraf analizinden önce de doğru metinler
-  const adIpucu = AI.adTahmin(s.urunAd || '');
-  const ilk = adIpucu.urun ? AI.metinOner(adIpucu.urun, adIpucu.motif || 'duz') : null;
+  // Satışta "Ürün ne?" alanına yazılan tanım da kullanılır (özellikler ondan çıkarılır)
+  let tanim = s.urunTanim || '';
+  const ipucuBul = () => {
+    const a = AI.adTahmin(s.urunAd || ''), b = AI.adTahmin(tanim);
+    return { urun: b.urun || a.urun, motif: b.motif || a.motif };
+  };
+  let adIpucu = ipucuBul();
+  const ilk = adIpucu.urun ? AI.metinOner(adIpucu.urun, adIpucu.motif || 'duz', '', tanim) : null;
   const durum = {
     stil: ayar.tanitimStil || 'ugc', tema: ayar.tanitimTema || 'zarif', onizFormat: 'dikey',
     formatlar: new Set(ayar.tanitimFormatlar || ['dikey', 'yatay']),
@@ -33,7 +39,7 @@ export async function tanitimStudyosu(s) {
     etiketler: ilk ? ilk.etiket.join(' ') : T.etiketlerOner(s.kategori, s.urunAd),
   };
   // Fotoğraf analizi (analiz.js): degisen = kullanıcının elle değiştirdiği alanlar (AI bunların üzerine yazmaz)
-  const ai = { hal: 'bos', oran: 0, sonuc: null, urunK: '', motifK: '', degisen: new Set(), sira: 0, imza: '' };
+  const ai = { hal: 'bos', oran: 0, sonuc: null, urunK: adIpucu.urun, motifK: adIpucu.motif || 'duz', degisen: new Set(), sira: 0, imza: '' };
   let fotolar = [];      // { id, blob, url, bmp | video, duzenli }
   let logo = null;
   try { logo = await T.resimYukle('logo/envai-amblem.png'); } catch { }
@@ -57,6 +63,8 @@ export async function tanitimStudyosu(s) {
           <label class="btn ana tam" style="margin-top:8px">${SVG_ARTI} Fotoğraf / video çek ya da ekle
             <input type="file" accept="image/*,video/*" multiple hidden id="foto-ekle"></label>
           <label class="alan tik" style="margin-top:8px"><input type="checkbox" name="duzenle" ${durum.duzenle ? 'checked' : ''}> ✨ Fotoğrafları otomatik düzenle <small class="soluk">(ışık, renk, netlik)</small></label>
+          <label class="alan" style="margin-top:10px">Ürün ne? <small class="soluk">kısaca anlatın · AI özellikleri ve yazıları buna göre hazırlar</small>
+            <textarea name="tanim" rows="2" placeholder="Örn. Bebek odası için pembe, isim ve çiçek nakışlı pamuklu yastık kılıfı">${esc(tanim)}</textarea></label>
           <div class="ai-kart" id="ai-kart" hidden></div>
         </div>
         <div class="bolum"><h3>2. Video</h3>
@@ -141,7 +149,7 @@ export async function tanitimStudyosu(s) {
   }
   /** AI metinlerini forma yazar. zorla değilse kullanıcının elle değiştirdiği alanlara dokunmaz. */
   function aiUygula(zorla = false) {
-    const o = AI.metinOner(ai.urunK, ai.motifK, ai.sonuc?.renk);
+    const o = AI.metinOner(ai.urunK, ai.motifK, ai.sonuc?.renk, tanim);
     if (!o) return;
     if (zorla) ai.degisen.clear();
     const yaz = a => !ai.degisen.has(a);
@@ -170,7 +178,7 @@ export async function tanitimStudyosu(s) {
         <p class="ipucu" style="margin:4px 0">İlk analiz için internet gerekir. Metinleri yine de elle yazabilirsiniz.</p>
         <button type="button" class="btn kucuk" data-ai="tekrar">↻ Tekrar dene</button>`;
     } else if (ai.hal === 'hazir') {
-      const s = ai.sonuc, u = AI.URUNLER[ai.urunK], o = AI.metinOner(ai.urunK, ai.motifK, s.renk);
+      const s = ai.sonuc, u = AI.URUNLER[ai.urunK], o = AI.metinOner(ai.urunK, ai.motifK, s.renk, tanim);
       const p = s.urun.find(x => x.k === ai.urunK)?.p || 0;
       const emin = s.urun[0].p >= 0.45 || !!adIpucu.urun;
       const adFarkli = adIpucu.urun && adIpucu.urun !== s.urun[0].k && ai.urunK === adIpucu.urun;
@@ -248,11 +256,27 @@ export async function tanitimStudyosu(s) {
   });
 
   // ---------------------------------------------------------------- girdiler
-  let zaman;
+  let zaman, tanimZaman;
   d.addEventListener('input', e => {
     const t = e.target;
     if (t.dataset.aiReklam) { if (ai.reklam) ai.reklam[t.dataset.aiReklam] = t.value; boyutla(t); return; }
     if (t.dataset.aiDiger !== undefined) { if (t.value) { ai.urunK = t.value; aiUygula(); } return; }
+    if (t.name === 'tanim') {
+      tanim = t.value;
+      clearTimeout(tanimZaman);
+      tanimZaman = setTimeout(() => {
+        // Tanım bir ürün söylüyorsa o seçilir; özellikler ve yazılar yeniden hazırlanır, satışa da kaydedilir
+        const onceki = adIpucu.urun;
+        adIpucu = ipucuBul();
+        if (adIpucu.urun && adIpucu.urun !== onceki) ai.urunK = adIpucu.urun;
+        if (adIpucu.motif) ai.motifK = adIpucu.motif;
+        ai.urunK ||= adIpucu.urun;
+        if (ai.urunK) aiUygula();
+        const kayit = st.satislar[s.id];
+        if (kayit && (kayit.urunTanim || '') !== tanim) { S.kaydet('satislar', { ...kayit, urunTanim: tanim }); s.urunTanim = tanim; }
+      }, 700);
+      return;
+    }
     if (t.dataset.oz) ai.degisen.add('oz');
     else if (['kanca', 'baslik', 'aciklama', 'etiketler'].includes(t.name)) ai.degisen.add(t.name);
     if (t.dataset.oz) durum.ozellikler[t.dataset.oz] = t.value;

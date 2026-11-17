@@ -3,7 +3,7 @@
 import * as S from './store.js';
 import * as D from './dosyadepo.js';
 import { para, satisHesap, tarihYaz } from './hesap.js';
-import { $, $$, esc, bildirim, sayfaAc, dosyaPaylas, dosyaIndir } from './ui.js';
+import { $, $$, esc, bildirim, sayfaAc, dosyaPaylas, dosyaIndir, medyaGoster } from './ui.js';
 import { tanitimStudyosu } from './studyo.js';
 
 const st = S.st;
@@ -71,7 +71,7 @@ export async function bitenDetay(id) {
   const ciz = async () => {
     const k = (await ozetler())['satis:' + id] || { uretilen: [], video: [], urun: [], ornek: [] };
     const izgara = (l, tur) => l.length ? `<div class="galeri-izgara ${tur === 'video' ? 'video' : ''}">${l.map(x => `
-      <div class="galeri-k">${videoMu(x) ? `<video src="${url(x)}" muted playsinline loop preload="metadata"></video><span class="vid">▶</span>` : `<img src="${url(x)}" alt="" loading="lazy">`}
+      <div class="galeri-k" data-buyut="${x.id}" role="button" tabindex="0" aria-label="Büyük göster">${videoMu(x) ? `<video src="${url(x)}" muted playsinline loop preload="metadata"></video><span class="vid">▶</span>` : `<img src="${url(x)}" alt="" loading="lazy">`}
         <div class="galeri-islem"><button class="ikon-btn" data-paylas="${x.id}" title="Paylaş">↗</button><button class="ikon-btn" data-indir="${x.id}" title="İndir">⤓</button><button class="ikon-btn sil" data-sil="${x.id}" title="Sil">×</button></div></div>`).join('')}</div>` : '';
     const hepsi = [...k.uretilen, ...k.video, ...k.urun, ...k.ornek];
     $('#bd-ic', d).innerHTML = `
@@ -84,14 +84,20 @@ export async function bitenDetay(id) {
       ${k.ornek.length ? `<h3>Müşterinin örnek görseli</h3>${izgara(k.ornek)}` : ''}
       ${!hepsi.length ? `<div class="kart bos"><div class="simge">📸</div><p>Bu işin henüz fotoğrafı yok.<br>Stüdyoda biten ürünün fotoğrafını ya da videosunu ekleyin; düzenlenmiş görseller ve tanıtım videosu hazırlansın.</p></div>` : ''}`;
     d._hepsi = hepsi;
+    d._gruplar = [k.uretilen, k.video, k.urun, k.ornek];
   };
   await ciz();
   d.addEventListener('click', async e => {
-    const t = e.target.closest('[data-paylas],[data-indir],[data-sil],[data-k]');
+    const t = e.target.closest('[data-paylas],[data-indir],[data-sil],[data-k],[data-buyut]');
     if (!t) return;
     const bul = i => d._hepsi.find(x => x.id === i);
     const dosya = x => new File([x.blob], x.ad || ('envai-' + x.id + (videoMu(x) ? '.mp4' : '.jpg')), { type: x.blob.type });
-    if (t.dataset.paylas) dosyaPaylas(dosya(bul(t.dataset.paylas)));
+    if (t.dataset.buyut) {
+      // Aynı bölümdeki dosyalar arasında oklarla gezilir
+      const grup = d._gruplar.find(l => l.some(x => x.id === t.dataset.buyut)) || [];
+      medyaGoster(grup.map(x => ({ url: url(x), video: videoMu(x), dosya: dosya(x) })), grup.findIndex(x => x.id === t.dataset.buyut));
+    }
+    else if (t.dataset.paylas) dosyaPaylas(dosya(bul(t.dataset.paylas)));
     else if (t.dataset.indir) dosyaIndir(dosya(bul(t.dataset.indir)));
     else if (t.dataset.sil) {
       if (confirm('Bu dosya silinsin mi?')) {

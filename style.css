@@ -580,3 +580,6 @@ dialog.medya-bak::backdrop { background: rgba(10, 6, 24, .94); }
 .video-sonuc .video-k video { display: block; pointer-events: none; }
 .video-k .buyut, .gorsel-k .buyut { position: absolute; right: 6px; bottom: 6px; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; padding: 3px 7px; border-radius: 8px; pointer-events: none; }
 .gorsel-k { position: relative; }
+.galeri-k { cursor: pointer; }
+.galeri-k video { pointer-events: none; }
+.galeri-k .galeri-islem { z-index: 1; }

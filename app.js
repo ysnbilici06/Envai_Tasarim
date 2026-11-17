@@ -1141,8 +1141,9 @@ function satisDuzenle(id, on = {}) {
   const eski = id ? st.satislar[id] : null;
   const s = structuredClone(eski || {
     tarih: bugun(), saat: R.saatSimdi(), urunId: '', urunAd: '', kategori: '', adet: 1, birimFiyat: 0, maliyet: 0, iscilik: 0,
-    musteri: '', durum: 'teslim', not: '', zaman: {}, kaynak: '', teslimTarihi: '', ...on,
+    musteri: '', durum: 'teslim', not: '', zaman: {}, kaynak: '', teslimTarihi: '', urunTanim: '', ...on,
   });
+  s.urunTanim ??= '';
   s.zaman ||= {};
   s.odeme ||= structuredClone(O.odemeDurumu(s));   // { durum, odemeler }
   delete s.odeme.ciro; delete s.odeme.tahsil; delete s.odeme.kalan;
@@ -1167,6 +1168,8 @@ function satisDuzenle(id, on = {}) {
           <button type="button" class="ikon-btn sil" data-k="is-sil" title="Seçili işi sil" aria-label="Seçili işi sil">${SVG_COP}</button>
         </div></div>
       <label class="alan" id="ozel-ad" ${s.urunId ? 'hidden' : ''}>İşin adı<input name="urunAd" value="${esc(s.urunAd)}" placeholder="Örn. Gelinlik paça kısaltma"></label>
+      <label class="alan">Ürün ne? <small class="soluk">kısaca anlatın · AI tanıtım yazılarını buna göre hazırlar</small>
+        <textarea name="urunTanim" rows="2" placeholder="Örn. Bebek odası için pembe, isim ve çiçek nakışlı pamuklu yastık kılıfı">${esc(s.urunTanim || '')}</textarea></label>
       <div class="uclu">
         <label class="alan">Adet<input name="adet" inputmode="decimal" value="${yaz(s.adet)}"></label>
         <label class="alan">Tarih<input name="tarih" type="date" value="${esc(s.tarih)}"></label>
@@ -1519,5 +1522,16 @@ ciz();
 B.baslat();
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-  navigator.serviceWorker.register('sw.js').catch(() => { });
+  navigator.serviceWorker.register('sw.js').then(kayit => {
+    // iPad'de uygulama arka planda açık kalır: öne gelince yeni sürüm var mı bak
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) kayit.update().catch(() => { }); });
+  }).catch(() => { });
+  // Yeni sürüm devreye girdi: açık pencere yoksa hemen yenile, varsa sor (yarım iş kaybolmasın)
+  const eskiVardi = !!navigator.serviceWorker.controller;
+  let yenilendi = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!eskiVardi || yenilendi) return;
+    if (!document.querySelector('dialog[open]')) { yenilendi = true; location.reload(); }
+    else bildirim('Uygulamanın yeni sürümü hazır', () => { yenilendi = true; location.reload(); }, 'Yenile');
+  });
 }

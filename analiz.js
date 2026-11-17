@@ -370,7 +370,7 @@ const buyukHarf = s => s.charAt(0).toLocaleUpperCase('tr') + s.slice(1);
  * Analiz sonucuna göre hazır metinler.
  * urunK/motifK: seçilen anahtarlar; renk: 'krem' gibi (boş olabilir)
  */
-export function metinOner(urunK, motifK, renk = '') {
+export function metinOner(urunK, motifK, renk = '', tanim = '') {
   const u = URUNLER[urunK];
   if (!u) return null;
   const m = u.nakis ? (MOTIFLER[motifK] || MOTIFLER.duz) : null;
@@ -379,11 +379,15 @@ export function metinOner(urunK, motifK, renk = '') {
   if (m?.ad) kancalar.splice(1, 0, `${buyukHarf(u.cumle)} üzerine ${m.ad} 🪡`);
   if (renk) kancalar.push(`${buyukHarf(renk)} tonlarında ${u.cumle} ${u.emoji}`);
   kancalar.push('Teslim etmeden önce son hali 😍', 'Siparişiniz hazır! ✨');
-  const ozellikler = u.nakis ? [u.ozellikler[0], m.ozellik, u.ozellikler[1]] : u.ozellikler.slice(0, 3);
+  const temel = u.nakis ? [u.ozellikler[0], m.ozellik, u.ozellikler[1]] : u.ozellikler.slice(0, 3);
+  // Kullanıcının anlattıkları önce; kalan yer ürün türünün özellikleriyle dolar
+  const ozel = tanimdanOzellik(tanim);
+  const ozellikler = [...new Set([...ozel, ...temel])].slice(0, ozel.length ? 4 : 3);
+  const tanimSatir = tanim.trim() ? `\n\n✨ ${buyukHarf(tanim.trim().replace(/[.\s]+$/, ''))}.` : '';
   // Siparişte müşteriden istenecek bilgi (araştırma: ilanlar kişiselleştirmeyi açıkça yazıyor)
   const siparis = u.siparis || (u.nakis ? 'isim, renk ve tarih' : 'ölçüler ve yapılacak işlem');
   // Instagram açıklamada ilk ~125 karakter görünür: en güçlü cümle başta
-  const aciklama = [u.aciklama, m?.cumle].filter(Boolean).join(' ') + `\n\n📝 Sipariş için ${siparis} bilgisini DM'den iletmeniz yeterli.`;
+  const aciklama = [u.aciklama, m?.cumle].filter(Boolean).join(' ') + tanimSatir + `\n\n📝 Sipariş için ${siparis} bilgisini DM'den iletmeniz yeterli.`;
   // Kısa reklam cümleleri (tek dokunuşla kopyalanır)
   const reklam = [
     aciklama,
@@ -402,20 +406,20 @@ export function metinOner(urunK, motifK, renk = '') {
 const AD_URUN = [
   ['hastane', /hastane|çıkış seti/], ['battaniye', /battaniye|pike/], ['kina', /kına/],
   ['gelinlik', /gelinlik|abiye|nişanlık/], ['bohca', /bohça|hurç|çeyiz seti/], ['ibadet', /kur.?an|tesbih|tespih|kese/],
-  ['seccade', /seccade|namazlak/], ['koltuk', /koltuk|kanepe/], ['yastik', /yastık|kırlent/],
-  ['havlu', /havlu/], ['bornoz', /bornoz/], ['bebek', /bebek|zıbın|tulum|salopet/],
+  ['seccade', /seccade|namazlak/], ['koltuk', /koltuk|kanepe/], ['yastik', /yastı[kğ]|kırlent/],
+  ['havlu', /havlu/], ['bornoz', /bornoz/], ['bebek', /bebe[kğ]|zıbın|tulum|salopet/],
   ['canta_ip', /kağıt ?ip|örgü çanta|ip çanta/], ['canta_bez', /çanta|tote/], ['gelinlik', /düğün/],
-  ['elbise', /elbise|etek|kıyafet dikim/], ['pantolon', /paça|pantolon|kot\b/], ['onluk', /önlük/],
+  ['elbise', /elbise|etek|kıyafet dikim/], ['pantolon', /paça|pantolon|kot\b/], ['onluk', /önlü[kğ]/],
   ['ust_giyim', /tişört|t-shirt|tshirt|sweat|hırka|gömlek|kazak|ceket|polo/], ['mendil', /mendil/],
-  ['nevresim', /nevresim|çarşaf|yatak örtü/], ['masa', /masa|runner|sofra/], ['anahtarlik', /anahtarlık|charm/],
-  ['toka', /toka|fiyonk/], ['kahve', /kahve|fincan|tepsi/], ['kasnak', /kasnak|pano/], ['sapka', /şapka|bere/],
-  ['patch', /logo|arma\b|patch|kurumsal/], ['perde', /perde/], ['makine', /makine/],
+  ['nevresim', /nevresim|çarşaf|yatak örtü/], ['masa', /masa|runner|sofra/], ['anahtarlik', /anahtarlı[kğ]|charm/],
+  ['toka', /toka|fiyonk/], ['kahve', /kahve|fincan|tepsi/], ['kasnak', /kasnak|pano/], ['sapka', /şapka|bere( |$)/],
+  ['patch', /logo|arma( |$|lı)|patch|kurumsal/], ['perde', /perde/], ['makine', /makine/],
   ['dikis', /tadilat|dikiş|fermuar|daralt|tamir/],
 ];
 const AD_MOTIF = [
-  ['kabe', /kabe/], ['kalp', /kalp/], ['logo', /logo|arma\b/], ['monogram', /harf|monogram/],
+  ['kabe', /kabe/], ['kalp', /kalp/], ['logo', /logo|arma( |$|lı)/], ['monogram', /harf|monogram/],
   ['cicek', /çiçek|gül|lale|papatya|lavanta/], ['dantel', /dantel/], ['figur', /ayıcık|tavşan|figür|karakter/],
-  ['geleneksel', /motif|geleneksel|yöresel/], ['isim', /isim|isimli|ad\b/],
+  ['geleneksel', /motif|geleneksel|yöresel/], ['isim', /isim/],
 ];
 /** Serbest metinden (ürün adı, kategori) ürün ve desen anahtarı tahmin eder. */
 export function adTahmin(metin = '') {
@@ -435,4 +439,56 @@ export function etiketOner(urunK, motifK) {
   const m = u.nakis ? MOTIF_ETIKET[motifK] : '';
   const yedek = u.nakis ? ['#kişiyeözel', '#nakışişleme', '#elemeği', '#hediyelik'] : ['#elemeği', '#özeldikim', '#terzi', '#elyapımı'];
   return [...new Set([...u.etiket.slice(0, m ? 3 : 4), m, ...yedek].filter(Boolean))].slice(0, 5);
+}
+
+// ================================================================ kullanıcının anlattığı üründen özellikler
+// "Bebek odası için pembe, isim ve çiçek nakışlı pamuklu yastık kılıfı" →
+// ["İsme özel nakış", "Pamuklu, cilt dostu kumaş", "Pembe renk tonlarında", "Yeni doğan bebeğe anlamlı hediye"]
+const T_KISISEL = [
+  [/isim|isimli/, 'İsme özel nakış'], [/tarih/, 'Özel tarih işlendi'], [/harf|monogram/, 'Baş harf nakışı'],
+  [/logo|arma( |$|lı)/, 'Logonuz birebir işlenir'],
+];
+const T_MALZEME = [
+  [/kadife/, 'Yumuşacık kadife kumaş'], [/pamuk|koton/, 'Pamuklu, cilt dostu kumaş'], [/keten/, 'Doğal keten kumaş'],
+  [/saten/, 'Parlak saten kumaş'], [/şifon/, 'Hafif şifon kumaş'], [/müslin/, 'Nefes alan müslin kumaş'],
+  [/welsoft|polar|peluş/, 'Yumuşacık, sıcak tutan kumaş'], [/güpür/, 'Güpür detaylı'], [/dantel/, 'Zarif dantel detaylar'],
+  [/tül\b/, 'Zarif tül detay'], [/kağıt ?ip/, 'Kağıt ipten el örgüsü'], [/makrome/, 'Makrome el örgüsü'],
+  [/örgü|tığ|şiş/, 'El örgüsü'], [/(^|[^a-zçğıöşü])deri/, 'Deri detaylı'], [/(^|[^a-zçğıöşü])(simli|sim ip|altın ip|gold)/, 'Simli iple işlendi'],
+  [/(^|[^a-zçğıöşü])inci|boncuk|taşlı|kristal/, 'İnci / boncuk süslemeli'], [/kurdele|fiyonk/, 'Kurdele / fiyonk detaylı'],
+];
+const T_OZEL_GUN = [
+  [/doğum ?günü/, 'Doğum günü için özel hediye'], [/yeni ?doğan|bebe[kğ]/, 'Yeni doğan bebeğe anlamlı hediye'],
+  [/kına/, 'Kına gecesine özel'], [/nişan|söz\b|kız isteme/, 'Söz ve nişan için özel'],
+  [/düğün|gelin|damat|çeyiz/, 'Düğün ve çeyiz için özel'], [/öğretmenler günü|öğretmen(ime|imize|e) /, 'Öğretmenler gününe anlamlı hediye'],
+  [/anneler günü|anneme|anneye/, 'Anneler gününe özel'], [/babalar günü|babama|babaya/, 'Babalar gününe özel'],
+  [/sevgili|yıl ?dönümü/, 'Sevgiliye ve yıl dönümüne özel'], [/asker/, 'Asker uğurlamasına özel'],
+  [/(^|[^a-zçğıöşü])hac|umre/, 'Hac ve umre hediyesi'], [/mevlüt|mevlid/, 'Mevlüt hediyesi'], [/sünnet/, 'Sünnet düğününe özel'],
+  [/mezun/, 'Mezuniyete özel hediye'], [/yılbaşı|yeni yıl/, 'Yılbaşı hediyesi'], [/bayram|ramazan/, 'Bayram hediyesi'],
+  [/hediye/, 'Hediye için ideal'],
+];
+const RENKLER = ['pembe', 'pudra', 'kırmızı', 'bordo', 'mavi', 'lacivert', 'turkuaz', 'mint', 'yeşil', 'sarı', 'hardal', 'turuncu',
+  'mor', 'lila', 'lavanta', 'beyaz', 'ekru', 'krem', 'bej', 'vizon', 'kahverengi', 'gri', 'antrasit', 'siyah', 'altın', 'gümüş'];
+
+/** Kullanıcının yazdığı ürün tanımından öne çıkan özellik cümleleri (en fazla 4). */
+export function tanimdanOzellik(tanim = '') {
+  const k = ' ' + tanim.toLocaleLowerCase('tr') + ' ';
+  const ilk = l => l.find(([r]) => r.test(k))?.[1];
+  const out = [];
+  // Öncelik: kişiselleştirme → özel gün → malzeme → renk → ölçü / set
+  const kisi = T_KISISEL.filter(([r]) => r.test(k)).map(([, x]) => x);
+  if (kisi.includes('İsme özel nakış') && kisi.includes('Özel tarih işlendi')) out.push('İsim ve tarih nakışı');
+  else if (kisi.length) out.push(kisi[0]);
+  const gun = ilk(T_OZEL_GUN);
+  if (gun) out.push(gun);
+  const malz = T_MALZEME.filter(([r]) => r.test(k)).map(([, x]) => x);
+  // "Kağıt ipten el örgüsü" varken ayrıca "El örgüsü" yazılmasın
+  out.push(...malz.filter((x, i) => !(x === 'El örgüsü' && malz.some(y => y !== x && /örgü/i.test(y)))).slice(0, 2));
+  const renk = RENKLER.filter(r => new RegExp(`(^|[^a-zçğıöşü])${r}`).test(k));
+  if (renk.length) out.push(`${buyukHarf(renk.slice(0, 2).join(' ve '))} renk tonlarında`);
+  const olcu = k.match(/(\d+)\s*[x×*]\s*(\d+)/);
+  if (olcu) out.push(`Ölçü: ${olcu[1]}×${olcu[2]} cm`);
+  if (/\bset|takım|(\d+) ?(li|lı|lu|lü)\b/.test(k)) out.push('Set / takım olarak hazırlanır');
+  if (/toplu/.test(k)) out.push('Toplu siparişe uygun');
+  if (/el nakışı|elde işlen|elle işlen|el işi/.test(k)) out.push('Tamamen el işçiliği');
+  return [...new Set(out)].slice(0, 4);
 }
