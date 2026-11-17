@@ -312,6 +312,7 @@ export async function pdfUret(govdeHtml, dosyaAdi) {
     const pdf = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     const mm = px => px * 210 / SAYFA_W;
     const sayfaSay = kesimler.length - 1;
+    const gorseller = [];   // aynı sayfalar JPG olarak (Instagram DM PDF kabul etmiyor)
     for (let i = 0; i < sayfaSay; i++) {
       const y0 = kesimler[i], h = kesimler[i + 1] - y0;
       const c = document.createElement('canvas');
@@ -327,11 +328,20 @@ export async function pdfUret(govdeHtml, dosyaAdi) {
       g.drawImage(canvas, 0, y0 * OLCEK, canvas.width, h * OLCEK, 0, UST * OLCEK, canvas.width, h * OLCEK);
       if (i) pdf.addPage();
       pdf.addImage(c.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, 210, 297);
+      // Görsel sürüm: sayfanın boş alt kısmı kırpılır (telefonda sohbet içinde daha büyük görünür)
+      const k = document.createElement('canvas');
+      k.width = c.width; k.height = Math.min(c.height, (UST + h + 36) * OLCEK);
+      k.getContext('2d').drawImage(c, 0, 0);
+      gorseller.push(await new Promise(ok => k.toBlob(ok, 'image/jpeg', 0.92)));
+      k.width = k.height = 0;
       pdf.setFontSize(8); pdf.setTextColor(150);
       pdf.text(`EnvaiTasarim  -  ${i + 1} / ${sayfaSay}`, 105, 297 - mm(22), { align: 'center' });
     }
     const blob = pdf.output('blob');
-    return new File([blob], dosyaAdi, { type: 'application/pdf' });
+    const dosya = new File([blob], dosyaAdi, { type: 'application/pdf' });
+    const kok = dosyaAdi.replace(/\.pdf$/i, '');
+    dosya.gorseller = gorseller.filter(Boolean).map((b, i, l) => new File([b], `${kok}${l.length > 1 ? '-' + (i + 1) : ''}.jpg`, { type: 'image/jpeg' }));
+    return dosya;
   } finally { kap.remove(); }
 }
 

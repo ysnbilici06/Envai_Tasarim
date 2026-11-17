@@ -542,9 +542,18 @@ async function pdfVer(uret) {
       <div><b>${esc(dosya.name)}</b><div class="soluk">${sayi(Math.round(dosya.size / 1024))} KB</div></div>
       <div class="btn-satir" style="margin-top:14px"><button class="btn ana" data-k="paylas">Paylaş / Dosyalara kaydet</button>
         <a class="btn" href="${url}" target="_blank" rel="noopener">Görüntüle</a></div>
-      <p class="ipucu" style="margin-top:10px">Paylaş menüsünden <b>Dosyalara Kaydet</b>, <b>Yazdır</b> ya da WhatsApp'ı seçebilirsiniz.</p></div>`,
+      ${dosya.gorseller?.length ? `<button class="btn tam" data-k="gorsel" style="margin-top:10px">🖼️ Görsel olarak paylaş <small class="soluk">Instagram DM · WhatsApp fotoğraf</small></button>` : ''}
+      <p class="ipucu" style="margin-top:10px">PDF: Paylaş menüsünden <b>WhatsApp</b>, <b>Dosyalara Kaydet</b> ya da <b>Yazdır</b>.
+        Instagram mesajı PDF kabul etmez; Instagram için <b>Görsel olarak paylaş</b>'ı kullanın (rapor fotoğraf olarak gider).</p></div>`,
   });
   d.addEventListener('close', () => setTimeout(() => URL.revokeObjectURL(url), 60000));
+  $('[data-k=gorsel]', d)?.addEventListener('click', async () => {
+    const l = dosya.gorseller;
+    if (navigator.canShare?.({ files: l })) {
+      try { await navigator.share({ files: l }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    l.forEach((f, i) => setTimeout(() => dosyaIndir(f), i * 350));
+  });
   $('[data-k=paylas]', d).addEventListener('click', async () => {
     if (navigator.canShare?.({ files: [dosya] })) {
       try { await navigator.share({ files: [dosya], title: dosya.name }); return; } catch (e) { if (e.name === 'AbortError') return; }
