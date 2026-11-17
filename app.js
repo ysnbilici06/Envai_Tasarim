@@ -590,6 +590,37 @@ function isBittiSor(s) {
 const isRaporu = s => pdfVer(() => R.isRaporuPdf(s, st, (DURUM[s.durum] || DURUM.teslim).ad));
 const musteriRaporu = s => pdfVer(() => O.musteriRaporuPdf(s));
 
+/** Satış formu: kayıtlı müşterilerden aranarak seçim (isim, telefon, Instagram'da arar). */
+function musteriSec(secildi) {
+  const kucuk = x => (x || '').toLocaleLowerCase('tr');
+  const liste = Object.values(st.musteriler).filter(m => m.ad).sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
+  const d = sayfaAc({
+    baslik: 'Müşteri seç', vazgec: 'Kapat',
+    govde: liste.length ? `<input type="search" class="mus-ara" placeholder="🔍 İsim, telefon ya da Instagram ile ara" autocomplete="off" autocapitalize="off">
+      <div class="mus-liste"></div>`
+      : `<div class="kart bos"><div class="simge">👥</div><p>Henüz kayıtlı müşteri yok.<br>Satış formundaki <b>👤 Kaydet</b> ile ya da Müşteriler sekmesinden ekleyebilirsiniz.</p></div>`,
+  });
+  if (!liste.length) return;
+  const kap = $('.mus-liste', d);
+  const ciz = q => {
+    const k = kucuk(q).trim(), rakam = k.replace(/\D/g, '');
+    const l = !k ? liste : liste.filter(m => kucuk(m.ad).includes(k) || kucuk(m.instagram).replace(/^@/, '').includes(k.replace(/^@/, ''))
+      || (rakam.length >= 3 && (m.telefon || '').replace(/\D/g, '').includes(rakam)));
+    kap.innerHTML = l.slice(0, 100).map(m => `<button type="button" class="mus-satir" data-mus="${m.id}">
+        <span class="avatar">${esc(m.ad.trim()[0]?.toLocaleUpperCase('tr') || '?')}</span>
+        <span><b>${esc(m.ad)}</b><small>${esc([m.telefon, m.instagram && '@' + m.instagram.replace(/^@/, '')].filter(Boolean).join(' · '))}</small></span></button>`).join('')
+      || '<p class="soluk" style="text-align:center;margin:18px 0">Bu aramayla müşteri bulunamadı.</p>';
+  };
+  ciz('');
+  $('.mus-ara', d).addEventListener('input', e => ciz(e.target.value));
+  kap.addEventListener('click', e => {
+    const b = e.target.closest('[data-mus]');
+    if (!b) return;
+    const m = st.musteriler[b.dataset.mus];
+    if (m) { secildi(m); d.close(); bildirim(`👤 ${m.ad} seçildi`); }
+  });
+}
+
 // ---------------------------------------------------------------- tema (açık / koyu / otomatik)
 // Seçim bu iPad'de saklanır; index.html'deki küçük betik açılışta aynı anahtarı okuyup yanıp sönmeyi önler.
 const TEMA_ANAHTAR = 'envai-tema';
@@ -1232,6 +1263,7 @@ function satisDuzenle(id, on = {}) {
       <p class="ipucu">Gider ve emek, seçtiğiniz işin kartından kendiliğinden gelir; bu satışa özel değiştirebilirsiniz.</p>
       <div class="alan">Müşteri
         <div class="is-sec"><input name="musteri" list="dl-mus" value="${esc(s.musteri)}" placeholder="İsim ya da Instagram kullanıcı adı" autocomplete="off">
+          <button type="button" class="ikon-btn ekle" data-k="musteri-sec" title="Kayıtlı müşterilerden seç">🔍<span>Seç</span></button>
           <button type="button" class="ikon-btn ekle" data-k="musteri-kart" title="Müşteri kartı">👤<span id="mus-dugme">Kaydet</span></button></div>
         <div class="mus-bilgi" id="mus-bilgi" hidden></div></div>
       <datalist id="dl-mus">${musteriler.map(k => `<option value="${esc(k)}">`).join('')}</datalist>
@@ -1294,7 +1326,8 @@ function satisDuzenle(id, on = {}) {
       // müşteri kaydı varsa bağla
       // ad değişmediyse mevcut bağ korunur (aynı adlı iki müşteri olabilir)
       const bagli = st.musteriler[s.musteriId];
-      if (!(bagli && eski && eski.musteri === s.musteri)) s.musteriId = M.musteriBul(s.musteri)?.id || '';
+      // Listeden seçilen müşteri (aynı isimde iki kişi olsa bile) korunur
+      if (!(bagli && (bagli.ad === s.musteri || (eski && eski.musteri === s.musteri)))) s.musteriId = M.musteriBul(s.musteri)?.id || '';
       // Stok: iş bekleyen → biten olunca düş; iptal edilirse birebir geri ekle; adet/iş değişirse farkı uygula
       const yeniBitti = BITTI.includes(s.durum) && !(eski && BITTI.includes(eskiDurum));
       if (yeniBitti && !s.stokDusuldu) { O.stokUygula(s, -1); s.stokDusuldu = true; }
@@ -1436,6 +1469,12 @@ function satisDuzenle(id, on = {}) {
         break;
       case 'odeme-ekle':
         s.odeme.odemeler.push({ tutar: O.odemeDurumu(s).kalan, tarih: bugun(), yontem: 'Nakit' }); odemeCiz();
+        break;
+      case 'musteri-sec':
+        musteriSec(m => {
+          s.musteri = m.ad; s.musteriId = m.id;
+          $('[name=musteri]', d).value = m.ad; musteriCiz();
+        });
         break;
       case 'musteri-kart': {
         const m = M.musteriBul(s.musteri);

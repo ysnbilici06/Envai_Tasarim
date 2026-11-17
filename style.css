@@ -569,6 +569,14 @@ label.btn { display: inline-flex; align-items: center; justify-content: center; 
 .fav-btn.aktif { background: #fff; color: #e3a82b; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 .galeri-diger { margin-top: 14px; }
 .galeri-diger summary { cursor: pointer; color: var(--soluk); padding: 8px 0; min-height: 44px; display: flex; align-items: center; }
+/* Satış formu → Müşteri seç */
+.mus-ara { width: 100%; margin-bottom: 10px; }
+.mus-liste { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow-y: auto; }
+.mus-satir { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 12px; min-height: 52px; cursor: pointer;
+  border: 1px solid var(--cizgi); border-radius: 12px; background: var(--yuzey); }
+.mus-satir:active { background: var(--vurgu-acik); }
+.mus-satir b { display: block; }
+.mus-satir small { color: var(--soluk); font-size: 13px; }
 /* Ayarlar → Görünüm: tema seçimi */
 .tema-sec { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .tema-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px; min-height: 44px; cursor: pointer;
