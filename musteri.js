@@ -1,7 +1,7 @@
 // Müşteri defteri: iletişim bilgileri, beden ölçüleri, geçmiş siparişler ve toplam alışveriş.
 import * as S from './store.js';
 import { para, sayi, satisHesap, tarihYaz } from './hesap.js';
-import { $, esc, trSirala, bildirim, sayfaAc, islemler } from './ui.js';
+import { $, esc, trSirala, bildirim, sayfaAc, islemler, telBicim, igAd } from './ui.js';
 import { odemeDurumu } from './siparis.js';
 
 const st = S.st;
@@ -33,7 +33,8 @@ let ara = '';
 export function musterilerGorunum() {
   const a = kucuk(ara);
   const liste = Object.values(st.musteriler)
-    .filter(m => !a || `${m.ad} ${m.instagram} ${m.telefon}`.toLocaleLowerCase('tr').includes(a))
+    .filter(m => !a || `${m.ad} ${m.instagram} ${m.telefon}`.toLocaleLowerCase('tr').includes(a)
+      || (a.replace(/\D/g, '').length >= 3 && (m.telefon || '').replace(/\D/g, '').includes(a.replace(/\D/g, ''))))
     .map(m => ({ m, o: musteriOzet(m) }))
     .sort((x, y) => (y.o.son || '').localeCompare(x.o.son || '') || trSirala(x.m.ad || '', y.m.ad || ''));
   // Kayıtlı olmayan ama satışlarda adı geçen müşteriler: tek dokunuşla kaydet
@@ -46,7 +47,7 @@ export function musterilerGorunum() {
     <div class="satir" role="button" tabindex="0" data-act="mus" data-id="${m.id}">
       <span class="avatar" style="--renk:var(--c${(m.ad || 'a').charCodeAt(0) % 8 + 1})">${esc((m.ad || '?').slice(0, 1).toLocaleUpperCase('tr'))}</span>
       <div class="orta"><div class="ad">${esc(m.ad)}</div>
-        <div class="ek">${[m.instagram && '@' + m.instagram.replace(/^@/, ''), m.telefon, o.adet ? `${o.adet} sipariş` : 'henüz sipariş yok', o.son && 'son: ' + tarihYaz(o.son)].filter(Boolean).map(esc).join(' · ')}</div></div>
+        <div class="ek">${[m.instagram && '@' + m.instagram.replace(/^@/, ''), m.telefon && telBicim(m.telefon), o.adet ? `${o.adet} sipariş` : 'henüz sipariş yok', o.son && 'son: ' + tarihYaz(o.son)].filter(Boolean).map(esc).join(' · ')}</div></div>
       <div class="sag"><div class="b">${para(o.toplam)}</div>${o.kalan ? `<div class="k"><span class="etiket kirmizi">Kalan ${para(o.kalan)}</span></div>` : '<div class="k soluk">toplam</div>'}</div>
       ${islemler('mus', m.id)}
     </div>`).join('')}</div>`
@@ -62,6 +63,7 @@ export function musteriDuzenle(id, sonra, onAd = '') {
   const eski = id ? st.musteriler[id] : null;
   const m = structuredClone(eski || { ad: onAd.replace(/^@/, ''), instagram: onAd.startsWith('@') ? onAd.slice(1) : '', telefon: '', adres: '', not: '', olculer: {} });
   m.olculer ||= {};
+  if (m.telefon) m.telefon = telBicim(m.telefon);   // eski kayıtlar da "0555 123 12 12" biçimine gelsin
   const ekOlcu = Object.keys(m.olculer).filter(k => !OLCULER.includes(k));
   const o = eski ? musteriOzet(eski) : null;
   const d = sayfaAc({
@@ -69,8 +71,9 @@ export function musteriDuzenle(id, sonra, onAd = '') {
     govde: `<div class="form">
       <label class="alan">Ad soyad<input name="ad" value="${esc(m.ad)}" autocomplete="off"></label>
       <div class="ikili">
-        <label class="alan">Instagram<input name="instagram" value="${esc(m.instagram)}" placeholder="kullanici_adi" autocapitalize="off"></label>
-        <label class="alan">Telefon<input name="telefon" value="${esc(m.telefon)}" inputmode="tel" placeholder="05xx xxx xx xx"></label>
+        <label class="alan">Instagram <small class="soluk">paylaşımda etiketlenir</small><div class="birimli on-ek"><span class="b">@</span><input name="instagram" value="${esc(igAd(m.instagram))}" placeholder="kullanici_adi" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="60"></div>
+          <a class="ig-kontrol" id="ig-kontrol" target="_blank" rel="noopener" ${m.instagram ? `href="https://www.instagram.com/${esc(igAd(m.instagram))}/"` : 'hidden'}>Profili kontrol et ↗</a></label>
+        <label class="alan">Telefon<input name="telefon" value="${esc(m.telefon ? telBicim(m.telefon) : '')}" inputmode="tel" maxlength="17" autocomplete="tel" placeholder="0555 123 12 12"></label>
       </div>
       <label class="alan">Adres<textarea name="adres" rows="2" placeholder="Kargo / teslim adresi">${esc(m.adres)}</textarea></label>
       <label class="alan">Diğer sosyal medya<input name="sosyal" value="${esc(m.sosyal || '')}" placeholder="Örn. TikTok @kullanici · Facebook adı" autocapitalize="off"></label>
@@ -85,7 +88,7 @@ export function musteriDuzenle(id, sonra, onAd = '') {
       ${m.telefon ? `<div class="btn-satir" style="margin-top:10px"><a class="btn kucuk" href="https://wa.me/${esc(waNo(m.telefon))}" target="_blank" rel="noopener">💬 WhatsApp'tan yaz</a><a class="btn kucuk" href="tel:${esc(m.telefon.replace(/\s/g, ''))}">📞 Ara</a></div>` : ''}</div>
       <div class="bolum"><button class="btn tehlike tam" data-k="sil">Müşteriyi sil</button></div>` : ''}`,
     kaydet: () => {
-      m.ad = (m.ad || '').trim(); m.instagram = (m.instagram || '').trim().replace(/^@/, '');
+      m.ad = (m.ad || '').trim(); m.instagram = igAd(m.instagram);
       if (!m.ad) { bildirim('Müşterinin adını yazın'); return false; }
       for (const k of Object.keys(m.olculer)) if (m.olculer[k] === '') delete m.olculer[k];
       const kayit = S.kaydet('musteriler', m);
@@ -96,6 +99,14 @@ export function musteriDuzenle(id, sonra, onAd = '') {
   d.addEventListener('input', e => {
     const t = e.target;
     if (t.dataset.olcu) m.olculer[t.dataset.olcu] = t.value.trim();
+    else if (t.name === 'instagram') {
+      // @, boşluk, büyük harf, Türkçe harf ve yapıştırılan profil linki kendiliğinden temizlenir
+      const ad = igAd(t.value);
+      if (ad !== t.value) t.value = ad;
+      m.instagram = ad;
+      const k = $('#ig-kontrol', d);
+      k.hidden = !ad; if (ad) k.href = `https://www.instagram.com/${ad}/`;
+    }
     else if (t.name) m[t.name] = t.value;
   });
   d.addEventListener('click', e => {

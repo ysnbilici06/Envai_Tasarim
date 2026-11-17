@@ -5,6 +5,56 @@ export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;'
 export const r2 = n => Math.round(n * 100) / 100;
 export const trSirala = (a, b) => a.localeCompare(b, 'tr');
 
+// ---------------------------------------------------------------- Instagram kullanıcı adı
+/** "@Ayse.Yilmaz", "instagram.com/ayse.yilmaz/?hl=tr" → "ayse.yilmaz" (Instagram kuralı: a-z 0-9 . _ , en çok 30). */
+export function igAd(deger) {
+  let v = String(deger ?? '').trim();
+  const url = v.match(/instagram\.com\/([^/?#\s]+)/i);
+  if (url) v = url[1];
+  const tr = { ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u' };
+  return v.replace(/^@+/, '').toLocaleLowerCase('tr').replace(/[çğıöşü]/g, c => tr[c]).replace(/[^a-z0-9._]/g, '').slice(0, 30);
+}
+
+// ---------------------------------------------------------------- telefon: "0555 123 12 12" (en fazla 11 hane)
+/** Rakamları alır, 0 ile başlatır (5xx → 05xx, +90 / 90 → 0), 11 haneyle sınırlar, 4-3-2-2 biçimler. */
+export function telBicim(deger) {
+  let r = String(deger ?? '').replace(/\D/g, '');
+  if (r.startsWith('90') && r.length >= 12) r = r.slice(2);
+  if (r && r[0] !== '0') r = '0' + r;
+  r = r.slice(0, 11);
+  return [r.slice(0, 4), r.slice(4, 7), r.slice(7, 9), r.slice(9, 11)].filter(Boolean).join(' ');
+}
+// Tüm telefon kutuları (inputmode="tel") yazarken biçimlenir. Yakalama evresinde çalışır:
+// sayfanın kendi input dinleyicileri biçimlenmiş değeri görür. İmleç, önündeki rakam sayısına göre korunur.
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (!(t instanceof HTMLInputElement) || t.inputMode !== 'tel') return;
+  let once = t.value, imlec = t.selectionStart ?? once.length;
+  // "+90 5…" yazılırken: ülke kodu tamamlanana kadar bekle (yoksa "+9" → "09" olur)
+  if (once.trim().startsWith('+') && once.replace(/\D/g, '').length < 12) return;
+  // Boşluğun hemen arkasında silme: rakam değişmezdi → önündeki rakamı sil
+  if (e.inputType === 'deleteContentBackward' && once.replace(/\D/g, '') === (t._telOnce || '').replace(/\D/g, '')) {
+    let j = imlec - 1;
+    while (j >= 0 && !/\d/.test(once[j])) j--;
+    if (j >= 0) { once = once.slice(0, j) + once.slice(j + 1); imlec = j; }
+  }
+  const yeni = telBicim(once);
+  t._telOnce = yeni;
+  if (yeni === t.value) return;
+  const ham = once.replace(/\D/g, '');
+  let rakam = once.slice(0, imlec).replace(/\D/g, '').length;
+  if (ham.startsWith('90') && ham.length >= 12) rakam = Math.max(0, rakam - 2) + 1;
+  else if (ham[0] !== '0' && rakam) rakam++;   // başa eklenen 0
+  t.value = yeni;
+  let i = 0;
+  while (i < yeni.length && rakam > 0) { if (/\d/.test(yeni[i])) rakam--; i++; }
+  try { t.setSelectionRange(i, i); } catch { }
+}, true);
+// Silme tuşu karşılaştırması için değişiklikten önceki değer
+document.addEventListener('beforeinput', e => {
+  if (e.target instanceof HTMLInputElement && e.target.inputMode === 'tel') e.target._telOnce = e.target.value;
+}, true);
+
 /** Kısa uyarı. Açık bir alt sayfa (dialog) varsa onun içinde gösterilir; yoksa
  *  dialog üst katmanda kaldığı için uyarı arkada görünmez kalıyordu.
  *  geriAl verilirse yanında "Geri al" düğmesi çıkar. */

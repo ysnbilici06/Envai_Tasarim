@@ -5,7 +5,7 @@ import * as D from './dosyadepo.js';
 import * as T from './tanitim.js';
 import * as AI from './analiz.js';
 import { para } from './hesap.js';
-import { $, $$, esc, bildirim, sayfaAc, dosyaPaylas, dosyaIndir, metinKopyala, medyaGoster, SVG_ARTI } from './ui.js';
+import { $, $$, esc, telBicim, igAd, bildirim, sayfaAc, dosyaPaylas, dosyaIndir, metinKopyala, medyaGoster, SVG_ARTI } from './ui.js';
 
 const st = S.st;
 const slug = s => (s || 'urun').toLocaleLowerCase('tr').replace(/[çğıöşü]/g, c => ({ ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u' }[c]))
@@ -19,6 +19,9 @@ export async function tanitimStudyosu(s) {
   // Ürün adından ipucu ("yastık üzerine nakış" → yastık kılıfı): fotoğraf analizinden önce de doğru metinler
   // Satışta "Ürün ne?" alanına yazılan tanım da kullanılır (özellikler ondan çıkarılır)
   let tanim = s.urunTanim || '';
+  // Satışın müşterisinin Instagram'ı: paylaşım metninde @etiketlenir (müşteriye bildirim gider)
+  const musteri = st.musteriler[s.musteriId] || Object.values(st.musteriler).find(m => m.ad && m.ad === s.musteri) || null;
+  const musteriIg = igAd(musteri?.instagram || (/^@/.test(s.musteri || '') ? s.musteri : ''));
   const ipucuBul = () => {
     const a = AI.adTahmin(s.urunAd || ''), b = AI.adTahmin(tanim);
     return { urun: b.urun || a.urun, motif: b.motif || a.motif };
@@ -38,6 +41,7 @@ export async function tanitimStudyosu(s) {
     cagri: "Sipariş için DM'den yaz 📩",
     aciklama: ilk ? ilk.aciklama : '',
     etiketler: ilk ? ilk.etiket.join(' ') : T.etiketlerOner(s.kategori, s.urunAd),
+    musteriEtiket: !!musteriIg,
   };
   // Fotoğraf analizi (analiz.js): degisen = kullanıcının elle değiştirdiği alanlar (AI bunların üzerine yazmaz)
   const ai = { hal: 'bos', oran: 0, sonuc: null, urunK: adIpucu.urun, motifK: adIpucu.motif || 'duz', degisen: new Set(), sira: 0, imza: '', tur: 0 };
@@ -82,7 +86,7 @@ export async function tanitimStudyosu(s) {
           </div>
           <div class="ikili">
             <label class="alan">Instagram kullanıcı adı<input name="instagram" value="${esc(durum.instagram)}" placeholder="envai_tasarim" autocapitalize="off"></label>
-            <label class="alan">WhatsApp<input name="whatsapp" value="${esc(durum.whatsapp)}" placeholder="05xx xxx xx xx" inputmode="tel"></label>
+            <label class="alan">WhatsApp<input name="whatsapp" value="${esc(durum.whatsapp ? telBicim(durum.whatsapp) : '')}" placeholder="0555 123 12 12" inputmode="tel" maxlength="17"></label>
           </div>
           <label class="alan">Kapanış cümlesi<input name="cagri" value="${esc(durum.cagri)}"></label>
           <label class="alan">Reklam açıklaması <small class="soluk">paylaşım metninin başına eklenir</small>
@@ -96,7 +100,10 @@ export async function tanitimStudyosu(s) {
           <div class="ilerleme" id="ilerleme" hidden><i></i><span></span></div>
           ${T.videoDestekli() ? '' : '<p class="ipucu negatif">Bu tarayıcı video üretemiyor; ürün görselleri yine de hazırlanabilir.</p>'}
           <div id="sonuclar"></div>
-          <div class="alan" style="margin-top:12px">Paylaşım metni <small class="soluk">Instagram açıklamasına yapıştırın</small>
+          <div class="alan" style="margin-top:12px">Paylaşım metni <small class="soluk">Paylaş'a basınca panoya kopyalanır · Instagram açıklamasına yapıştırın</small>
+            ${musteriIg ? `<label class="tik etiket-sec"><input type="checkbox" name="musteriEtiket" ${durum.musteriEtiket ? 'checked' : ''}> 📍 Müşteriyi etiketle <b>@${esc(musteriIg)}</b>
+              <a class="ig-kontrol" href="https://www.instagram.com/${esc(musteriIg)}/" target="_blank" rel="noopener">kontrol et ↗</a></label>`
+              : `<p class="ipucu" style="margin:4px 0">Müşterinin Instagram adını müşteri kartına yazarsanız paylaşımda @etiketlenir.</p>`}
             <textarea id="metin" rows="7"></textarea>
             <button class="btn kucuk" data-k="kopyala" style="margin-top:6px;align-self:flex-start">📋 Metni kopyala</button></div>
         </div>
@@ -241,7 +248,7 @@ export async function tanitimStudyosu(s) {
     tuval.hidden = !fotolar.length;
     anim = fotolar.length ? animYap(durum.onizFormat) : null;
     if (anim) { tuval.width = anim.W / 2; tuval.height = anim.H / 2; tuval.dataset.yon = anim.W > anim.H ? 'yatay' : 'dikey'; }
-    $('#metin', d).value = T.paylasimMetni({ ...metinler(), kategori: s.kategori || '' });
+    $('#metin', d).value = T.paylasimMetni({ ...metinler(), kategori: s.kategori || '', musteriIg: durum.musteriEtiket ? musteriIg : '' });
   }
   const gtx = tuval.getContext('2d', { alpha: false });
   (function dongu() {
@@ -290,6 +297,7 @@ export async function tanitimStudyosu(s) {
     else if (t.dataset.format) { t.checked ? durum.formatlar.add(t.dataset.format) : durum.formatlar.delete(t.dataset.format); return; }
     else if (t.name === 'fiyatGoster') durum.fiyatGoster = t.checked;
     else if (t.name === 'duzenle') durum.duzenle = t.checked;
+    else if (t.name === 'musteriEtiket') { durum.musteriEtiket = t.checked; yenidenKur(); return; }
     else if (t.name in durum) durum[t.name] = t.value;
     else return;
     clearTimeout(zaman); zaman = setTimeout(() => { yenidenKur(); bas = performance.now(); }, 250);
@@ -379,6 +387,13 @@ export async function tanitimStudyosu(s) {
     }
   }
 
+  // Instagram paylaşım menüsünden gelen yazıyı almaz: paylaşmadan hemen önce metin (müşteri @etiketiyle) panoya
+  // kopyalanır, Instagram'da açıklamaya "Yapıştır" yeterli. await yok: dokunma izni paylaşım menüsüne kalsın.
+  function metniPanoya() {
+    const metin = $('#metin', d).value;
+    if (!metin || !navigator.clipboard?.writeText) return;
+    navigator.clipboard.writeText(metin).then(() => bildirim(`📋 Açıklama panoya kopyalandı${durum.musteriEtiket && musteriIg ? ` (@${musteriIg} etiketli)` : ''} · Instagram'da yapıştırın`)).catch(() => { });
+  }
   function sonucGoster(tur, dosyalar, kayitlar = []) {
     const kap = document.createElement('div');
     kap.className = 'kart ic sonuc-kart';
@@ -410,10 +425,10 @@ export async function tanitimStudyosu(s) {
         bildirim(fav ? "⭐ Favorilere eklendi · Ürün Galerisi'nde görünür" : 'Favoriden çıkarıldı');
       }
       else if (t.dataset.buyut) medyaGoster(dosyalar.map((f, j) => ({ url: urller[j], video: tur === 'video', dosya: f })), +t.dataset.buyut);
-      else if (t.dataset.paylas) await dosyaPaylas(dosyalar[t.dataset.paylas]);
+      else if (t.dataset.paylas) { metniPanoya(); await dosyaPaylas(dosyalar[t.dataset.paylas]); }
       else if (t.dataset.indir) dosyaIndir(dosyalar[t.dataset.indir]);
       else if (t.dataset.hepsi === 'indir') dosyalar.forEach((f, i) => setTimeout(() => dosyaIndir(f), i * 350));
-      else if (navigator.canShare?.({ files: dosyalar })) { try { await navigator.share({ files: dosyalar }); } catch { } }
+      else if (navigator.canShare?.({ files: dosyalar })) { metniPanoya(); try { await navigator.share({ files: dosyalar }); } catch { } }
       else dosyalar.forEach((f, i) => setTimeout(() => dosyaIndir(f), i * 350));
     });
     // Aynı türün önceki sonucu ekrandan da kalkar: yalnızca en son üretilen görünür

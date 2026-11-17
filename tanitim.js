@@ -487,7 +487,7 @@ export function etiketlerOner(kategori = '', baslik = '') {
   return [...etiket].slice(0, 5).join(' ');
 }
 
-export function paylasimMetni({ baslik, kategori = '', ozellikler = [], fiyat, instagram, whatsapp, aciklama = '', etiketler = '' }) {
+export function paylasimMetni({ baslik, kategori = '', ozellikler = [], fiyat, instagram, whatsapp, aciklama = '', etiketler = '', musteriIg = '' }) {
   const etiket = (etiketler || etiketlerOner(kategori, baslik)).split(/\s+/).filter(Boolean)
     .map(x => x.startsWith('#') ? x : '#' + x);
   return [
@@ -502,6 +502,8 @@ export function paylasimMetni({ baslik, kategori = '', ozellikler = [], fiyat, i
     instagram ? `📍 @${instagram.replace(/^@/, '')}` : '',
     '',
     [...etiket].join(' '),
+    // Müşteri etiketi en altta (kullanıcının cümlesi): Instagram'da @ad müşteriye bildirim olarak gider
+    ...(musteriIg ? ['', `🤍 @${musteriIg.replace(/^@/, '')} siparişinizi güle güle kullanın, bizi tercih ettiğiniz için teşekkür ederiz.`] : []),
   ].filter((x, i, a) => !(x === '' && a[i - 1] === '')).join('\n').trim();
 }
 

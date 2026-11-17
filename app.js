@@ -12,7 +12,7 @@ import * as K from './kilit.js';
 import * as D from './dosyadepo.js';
 import { excelDosyalari } from './disari.js';
 import * as BT from './bitenler.js';
-import { $, $$, esc, r2, trSirala, bildirim, SVG_KALEM, SVG_COP, SVG_ARTI, islemler, sayfaAc, kisaBirim, dosyaPaylas, dosyaIndir, metinKopyala } from './ui.js';
+import { $, $$, esc, r2, trSirala, telBicim, bildirim, SVG_KALEM, SVG_COP, SVG_ARTI, islemler, sayfaAc, kisaBirim, dosyaPaylas, dosyaIndir, metinKopyala } from './ui.js';
 
 const st = S.st;
 
@@ -676,7 +676,7 @@ function ayarlar() {
     <div class="kart ic form">
       <div class="ikili">
         <label class="alan">Instagram<input data-ayar-metin="instagram" value="${esc(st.ayar.instagram || '')}" placeholder="envai_tasarim" autocapitalize="off"></label>
-        <label class="alan">WhatsApp<input data-ayar-metin="whatsapp" value="${esc(st.ayar.whatsapp || '')}" placeholder="05xx xxx xx xx" inputmode="tel"></label>
+        <label class="alan">WhatsApp<input data-ayar-metin="whatsapp" value="${esc(st.ayar.whatsapp ? telBicim(st.ayar.whatsapp) : '')}" placeholder="0555 123 12 12" inputmode="tel" maxlength="17"></label>
       </div>
       <label class="alan">Aylık kazanç hedefi
         <div class="birimli"><input data-ayar="aylikHedef" inputmode="decimal" value="${yaz(st.ayar.aylikHedef)}" placeholder="Örn. 15000"><span class="b">₺</span></div></label>
