@@ -291,6 +291,13 @@ export async function pdfUret(govdeHtml, dosyaAdi) {
     }
     const OLCEK = 2, SAYFA_W = 794, SAYFA_H = 1123, UST = 40, ALT = 52;
     const kullanilir = SAYFA_H - UST - ALT;
+    // data-sigdir'li görsel (teslim raporundaki ürün fotoğrafı): sayfa taşarsa görsel küçülür, belge tek sayfada kalır
+    const sigdir = rp.querySelector('img[data-sigdir]');
+    if (sigdir && rp.scrollHeight > kullanilir) {
+      const h0 = sigdir.height, w0 = sigdir.width;
+      const h = Math.max(180, h0 - (rp.scrollHeight - kullanilir) - 4);
+      sigdir.height = h; sigdir.width = Math.round(w0 * h / h0);
+    }
     const top0 = rp.getBoundingClientRect().top;
     const sinirlar = [...rp.querySelectorAll('tr, h3, .rp-blok, .rp-ust, .rp-sonuc, .rp-kartlar, p')]
       .map(e => Math.ceil(e.getBoundingClientRect().bottom - top0)).sort((a, b) => a - b);

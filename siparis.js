@@ -145,7 +145,7 @@ export function fisPdf(s, tur = 'fis') {
 async function urunGorseli(satisId) {
   const sahip = 'satis:' + satisId;
   const resim = x => !(x.blob?.type || '').startsWith('video');
-  const puan = x => (/vitrin/.test(x.ad) ? -4 : 0) + (/-kare-/.test(x.ad) ? 2 : /-dikey-/.test(x.ad) ? 1 : 0);
+  const puan = x => (x.fav ? 8 : 0) + (/vitrin/.test(x.ad) ? -4 : 0) + (/-kare-/.test(x.ad) ? 2 : /-dikey-/.test(x.ad) ? 1 : 0);
   const sec = (await D.liste(sahip, 'urun').catch(() => [])).filter(resim)[0]
     || (await D.liste(sahip, 'uretilen').catch(() => [])).filter(resim).sort((a, b) => puan(b) - puan(a) || a.eklendi - b.eklendi)[0];
   if (!sec) return null;
@@ -164,7 +164,7 @@ export async function musteriRaporuPdf(s) {
   let resimHtml = '';
   if (gorsel) {
     const enW = 660, enH = 415, o2 = Math.min(enW / gorsel.w, enH / gorsel.h);
-    resimHtml = `<div class="rp-blok mr-gorsel"><img src="${gorsel.url}" width="${Math.round(gorsel.w * o2)}" height="${Math.round(gorsel.h * o2)}" alt=""></div>`;
+    resimHtml = `<div class="rp-blok mr-gorsel"><img data-sigdir src="${gorsel.url}" width="${Math.round(gorsel.w * o2)}" height="${Math.round(gorsel.h * o2)}" alt=""></div>`;
   }
   const siparisT = z.alindi || (s.tarih ? s.tarih + (s.saat ? 'T' + s.saat : '') : '');
   const teslimT = z.teslim || z.bitti || s.teslimTarihi || '';

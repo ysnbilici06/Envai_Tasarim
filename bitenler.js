@@ -21,7 +21,10 @@ async function ozetler() {
   }
   for (const k of Object.values(o)) {
     for (const l of Object.values(k)) Array.isArray(l) && l.sort((a, b) => a.eklendi - b.eklendi);
-    k.kapak = k.uretilen.find(x => /vitrin/.test(x.ad)) || k.uretilen[0] || k.urun.find(x => !videoMu(x)) || null;
+    // Galeride AI üretimlerinden yalnızca ⭐ favoriler öne çıkar (kullanıcı isteği); diğerleri "favori olmayanlar"da
+    k.favGorsel = k.uretilen.filter(x => x.fav); k.favVideo = k.video.filter(x => x.fav);
+    k.diger = [...k.uretilen, ...k.video].filter(x => !x.fav);
+    k.kapak = k.favGorsel.find(x => /vitrin/.test(x.ad)) || k.favGorsel[0] || k.urun.find(x => !videoMu(x)) || null;
   }
   return o;
 }
@@ -52,13 +55,13 @@ export async function kapaklariDoldur() {
   const o = await ozetler();
   for (const kart of $$('.pf-kart', kap)) {
     const k = o[kart.dataset.sahip];
-    const n = k ? k.uretilen.length + k.video.length + k.urun.length : 0;
+    const n = k ? k.favGorsel.length + k.favVideo.length + k.urun.length : 0;
     if (filtre === 'gorselli' && !n) { kart.hidden = true; continue; }
     if (filtre === 'gorselsiz' && n) { kart.hidden = true; continue; }
     if (!k) continue;
     if (k.kapak) $('.pf-kapak', kart).innerHTML = `<img src="${url(k.kapak)}" alt="" loading="lazy">`;
     const say = $('.pf-say', kart);
-    const p = [k.uretilen.length && `🖼️ ${k.uretilen.length}`, k.video.length && `🎬 ${k.video.length}`, k.urun.length && `📷 ${k.urun.length}`].filter(Boolean);
+    const p = [k.favGorsel.length && `⭐🖼️ ${k.favGorsel.length}`, k.favVideo.length && `⭐🎬 ${k.favVideo.length}`, k.urun.length && `📷 ${k.urun.length}`].filter(Boolean);
     if (p.length) { say.textContent = p.join('  '); say.hidden = false; }
   }
 }
@@ -69,30 +72,39 @@ export async function bitenDetay(id) {
   if (!s) return;
   const d = sayfaAc({ baslik: s.urunAd || 'Biten iş', vazgec: 'Kapat', govde: '<div id="bd-ic"><p class="soluk">Yükleniyor…</p></div>' });
   const ciz = async () => {
-    const k = (await ozetler())['satis:' + id] || { uretilen: [], video: [], urun: [], ornek: [] };
+    const k = (await ozetler())['satis:' + id] || { uretilen: [], video: [], urun: [], ornek: [], favGorsel: [], favVideo: [], diger: [] };
+    const aiMi = x => x.tur === 'uretilen' || x.tur === 'video';
     const izgara = (l, tur) => l.length ? `<div class="galeri-izgara ${tur === 'video' ? 'video' : ''}">${l.map(x => `
       <div class="galeri-k" data-buyut="${x.id}" role="button" tabindex="0" aria-label="Büyük göster">${videoMu(x) ? `<video src="${url(x)}" muted playsinline loop preload="metadata"></video><span class="vid">▶</span>` : `<img src="${url(x)}" alt="" loading="lazy">`}
+        ${aiMi(x) ? `<button class="fav-btn ${x.fav ? 'aktif' : ''}" data-fav="${x.id}" aria-pressed="${!!x.fav}" title="${x.fav ? 'Favoriden çıkar' : 'Favorilere ekle'}">${x.fav ? '⭐' : '☆'}</button>` : ''}
         <div class="galeri-islem"><button class="ikon-btn" data-paylas="${x.id}" title="Paylaş">↗</button><button class="ikon-btn" data-indir="${x.id}" title="İndir">⤓</button><button class="ikon-btn sil" data-sil="${x.id}" title="Sil">×</button></div></div>`).join('')}</div>` : '';
-    const hepsi = [...k.uretilen, ...k.video, ...k.urun, ...k.ornek];
+    const hepsi = [...k.favGorsel, ...k.favVideo, ...k.urun, ...k.ornek];
     $('#bd-ic', d).innerHTML = `
       <div class="bd-ust"><div><div class="soluk">${esc([s.kategori, s.musteri, tarihYaz((s.zaman?.bitti || s.tarih || '').slice(0, 10))].filter(Boolean).join(' · '))}</div>
         <b class="bd-fiyat">${para(satisHesap(s).ciro)}</b></div>
         <div class="btn-satir"><button class="btn ana" data-k="studyo">🎬 Tanıtım stüdyosu</button>${hepsi.length ? '<button class="btn" data-k="hepsi">Hepsini paylaş</button>' : ''}</div></div>
-      ${k.uretilen.length ? `<h3>Düzenlenmiş ürün görselleri <small>${k.uretilen.length}</small></h3>${izgara(k.uretilen)}` : ''}
-      ${k.video.length ? `<h3>Tanıtım videoları <small>${k.video.length}</small></h3>${izgara(k.video, 'video')}` : ''}
+      ${k.favGorsel.length ? `<h3>⭐ Favori ürün görselleri <small>${k.favGorsel.length}</small></h3>${izgara(k.favGorsel)}` : ''}
+      ${k.favVideo.length ? `<h3>⭐ Favori tanıtım videoları <small>${k.favVideo.length}</small></h3>${izgara(k.favVideo, 'video')}` : ''}
       ${k.urun.length ? `<h3>Çekilen fotoğraf / video <small>${k.urun.length}</small></h3>${izgara(k.urun)}` : ''}
       ${k.ornek.length ? `<h3>Müşterinin örnek görseli</h3>${izgara(k.ornek)}` : ''}
-      ${!hepsi.length ? `<div class="kart bos"><div class="simge">📸</div><p>Bu işin henüz fotoğrafı yok.<br>Stüdyoda biten ürünün fotoğrafını ya da videosunu ekleyin; düzenlenmiş görseller ve tanıtım videosu hazırlansın.</p></div>` : ''}`;
-    d._hepsi = hepsi;
-    d._gruplar = [k.uretilen, k.video, k.urun, k.ornek];
+      ${!hepsi.length && !k.diger.length ? `<div class="kart bos"><div class="simge">📸</div><p>Bu işin henüz fotoğrafı yok.<br>Stüdyoda biten ürünün fotoğrafını ya da videosunu ekleyin; düzenlenmiş görseller ve tanıtım videosu hazırlansın.</p></div>` : ''}
+      ${k.diger.length ? `<details class="galeri-diger" ${d._digerAcik ? 'open' : ''}><summary>Favori olmayan AI üretimleri (${k.diger.length}) · beğendiğinizi ☆ ile favorileyin</summary>${izgara(k.diger)}</details>` : ''}`;
+    $('.galeri-diger', d)?.addEventListener('toggle', e => { d._digerAcik = e.target.open; });
+    d._hepsi = [...hepsi, ...k.diger];
+    d._gruplar = [k.favGorsel, k.favVideo, k.urun, k.ornek, k.diger];
   };
   await ciz();
   d.addEventListener('click', async e => {
-    const t = e.target.closest('[data-paylas],[data-indir],[data-sil],[data-k],[data-buyut]');
+    const t = e.target.closest('[data-fav],[data-paylas],[data-indir],[data-sil],[data-k],[data-buyut]');
     if (!t) return;
     const bul = i => d._hepsi.find(x => x.id === i);
     const dosya = x => new File([x.blob], x.ad || ('envai-' + x.id + (videoMu(x) ? '.mp4' : '.jpg')), { type: x.blob.type });
-    if (t.dataset.buyut) {
+    if (t.dataset.fav) {
+      const fav = await D.favoriYap(t.dataset.fav);
+      bildirim(fav ? '⭐ Favorilere eklendi' : 'Favoriden çıkarıldı');
+      ciz();
+    }
+    else if (t.dataset.buyut) {
       // Aynı bölümdeki dosyalar arasında oklarla gezilir
       const grup = d._gruplar.find(l => l.some(x => x.id === t.dataset.buyut)) || [];
       medyaGoster(grup.map(x => ({ url: url(x), video: videoMu(x), dosya: dosya(x) })), grup.findIndex(x => x.id === t.dataset.buyut));
@@ -108,7 +120,7 @@ export async function bitenDetay(id) {
     }
     else if (t.dataset.k === 'studyo') { const st2 = await tanitimStudyosu(s); st2?.addEventListener('close', () => d.isConnected && ciz()); }
     else if (t.dataset.k === 'hepsi') {
-      const l = d._hepsi.filter(x => x.tur !== 'ornek').map(dosya);
+      const l = d._hepsi.filter(x => x.tur !== 'ornek' && (!(x.tur === 'uretilen' || x.tur === 'video') || x.fav)).map(dosya);
       if (navigator.canShare?.({ files: l })) { try { await navigator.share({ files: l }); } catch { } } else l.forEach((f, i) => setTimeout(() => dosyaIndir(f), i * 350));
     }
   });

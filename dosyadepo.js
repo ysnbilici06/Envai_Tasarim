@@ -1,6 +1,6 @@
 // Büyük dosyalar (ürün fotoğrafları, müşterinin örnek görselleri, .pes nakış dosyaları)
 // localStorage'a sığmaz; cihazın IndexedDB deposunda tutulur. Bulutla eşitlenmez.
-// Kayıt: { id, sahip: 'satis:<id>' | 'is:<id>', tur: 'urun' | 'ornek' | 'pes', ad, blob, eklendi }
+// Kayıt: { id, sahip: 'satis:<id>' | 'is:<id>', tur: 'urun' | 'ornek' | 'pes' | 'uretilen' | 'video', ad, blob, eklendi, fav? }
 
 const DB_AD = 'envai_dosyalar', DEPO = 'dosyalar';
 let dbSoz = null;
@@ -32,6 +32,22 @@ export async function liste(sahip, tur) {
   return hepsi.filter(x => !tur || x.tur === tur).sort((a, b) => a.eklendi - b.eklendi);
 }
 export async function sil(id) { await istek((await depo('readwrite')).delete(id)); }
+/** AI üretimini favorile / favoriden çıkar (Ürün Galerisi yalnızca favorileri öne çıkarır). Yeni durumu döner. */
+export async function favoriYap(id, fav) {
+  const d = await depo('readwrite');
+  // get → put aynı olay içinde (eski WebKit'te await arası işlem kapanabiliyor)
+  return new Promise((ok, hata) => {
+    const r = d.get(id);
+    r.onerror = () => hata(r.error);
+    r.onsuccess = () => {
+      const x = r.result;
+      if (!x) return ok(false);
+      x.fav = fav ?? !x.fav;
+      const p = d.put(x);
+      p.onsuccess = () => ok(x.fav); p.onerror = () => hata(p.error);
+    };
+  });
+}
 export async function sayilar(tur) {
   const say = {};
   for (const x of await istek((await depo('readonly')).getAll())) if (!tur || x.tur === tur) say[x.sahip] = (say[x.sahip] || 0) + 1;

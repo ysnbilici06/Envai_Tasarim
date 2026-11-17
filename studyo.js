@@ -91,7 +91,7 @@ export async function tanitimStudyosu(s) {
             <input name="etiketler" value="${esc(durum.etiketler)}" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
         </div>
         <div class="bolum"><h3>3. Oluştur</h3>
-          <p class="ipucu" style="margin:0">Dikey (9:16) üretilir: Instagram Reels / Hikâye ve WhatsApp durumu için. Yeniden ürettiğinizde öncekiler silinir; Ürün Galerisi'nde yalnızca en son hali kalır.</p>
+          <p class="ipucu" style="margin:0">Dikey (9:16) üretilir: Instagram Reels / Hikâye ve WhatsApp durumu için. Beğendiklerinizi ☆ ile favorileyin: Ürün Galerisi'nde favoriler görünür. Yeniden ürettiğinizde favori olmayanlar silinir.</p>
           <div class="btn-satir"><button class="btn ana" data-k="video">🎬 Video oluştur</button><button class="btn" data-k="gorsel">🖼️ Ürün görselleri</button></div>
           <div class="ilerleme" id="ilerleme" hidden><i></i><span></span></div>
           ${T.videoDestekli() ? '' : '<p class="ipucu negatif">Bu tarayıcı video üretemiyor; ürün görselleri yine de hazırlanabilir.</p>'}
@@ -346,8 +346,8 @@ export async function tanitimStudyosu(s) {
     const formatlar = Object.keys(T.FORMATLAR).filter(f => durum.formatlar.has(f));
     if (!formatlar.length) return bildirim('En az bir biçim seçin');
     const tip = tur === 'video' ? 'video' : 'uretilen';
-    const eskiler = await D.liste(sahip, tip).catch(() => []);
-    if (eskiler.length && !confirm(`Bu ürün için daha önce ${tur === 'video' ? 'video' : 'görsel'} üretilmiş. Yenisi üretilince eskiler silinsin ve galeride yalnızca en son hali kalsın mı?`)) return;
+    // Yeniden üretimde favorilenmemiş eski üretimler silinir; ⭐ favoriler her zaman kalır
+    const eskiler = (await D.liste(sahip, tip).catch(() => [])).filter(x => !x.fav);
     S.ayarKaydet({ instagram: durum.instagram.replace(/^@/, ''), whatsapp: durum.whatsapp, tanitimStil: durum.stil, tanitimTema: durum.tema, tanitimFormatlar: formatlar, tanitimDuzenle: durum.duzenle });
     mesgul = true; $$('[data-k=video],[data-k=gorsel]', d).forEach(b => { b.disabled = true; });
     fotolar.forEach(f => f.video?.pause());
@@ -364,11 +364,12 @@ export async function tanitimStudyosu(s) {
         dosyalar.push(...await T.gorselSetiUret({ fotolar: kaynaklar(), logo, formatlar, tema: durum.tema, m: metinler(), adOnek: onek },
           o => ilerlemeGoster(o, `Görseller hazırlanıyor… %${Math.round(o * 100)}`)));
       }
-      sonucGoster(tur, dosyalar);
-      // Ürün Galerisi: yalnızca en son üretilen kalır (yeni üretim başarılı olduktan SONRA eskiler silinir)
-      for (const f of dosyalar) await D.ekle(sahip, tip, f, f.name);
+      // Yeni üretim başarılı olduktan SONRA favori olmayan eskiler silinir
+      const kayitlar = [];
+      for (const f of dosyalar) kayitlar.push(await D.ekle(sahip, tip, f, f.name));
       for (const x of eskiler) await D.sil(x.id);
-      bildirim((tur === 'video' ? `${dosyalar.length} video hazır` : `${dosyalar.length} görsel hazır`) + (eskiler.length ? ' · galerideki eskilerin yerine geçti' : " · Ürün Galerisi'ne eklendi"));
+      sonucGoster(tur, dosyalar, kayitlar);
+      bildirim((tur === 'video' ? 'Video hazır' : `${dosyalar.length} görsel hazır`) + " · beğendiklerinizi ☆ ile favorileyin, galeride onlar görünür");
     } catch (err) {
       console.error(err);
       bildirim(tur === 'video' ? 'Video oluşturulamadı' : 'Görseller oluşturulamadı');
@@ -378,28 +379,37 @@ export async function tanitimStudyosu(s) {
     }
   }
 
-  function sonucGoster(tur, dosyalar) {
+  function sonucGoster(tur, dosyalar, kayitlar = []) {
     const kap = document.createElement('div');
     kap.className = 'kart ic sonuc-kart';
     const urller = dosyalar.map(f => URL.createObjectURL(f));
     d.addEventListener('close', () => urller.forEach(u => URL.revokeObjectURL(u)), { once: true });
     const mb = n => (n / 1048576).toLocaleString('tr-TR', { maximumFractionDigits: 1 }) + ' MB';
+    const yildiz = i => kayitlar[i] ? `<button type="button" class="fav-btn" data-fav="${i}" aria-pressed="false" aria-label="Favorilere ekle" title="Favorilere ekle">☆</button>` : '';
     kap.innerHTML = tur === 'video'
       ? `<h3>🎬 Videolar</h3>${dosyalar.map((f, i) => `
         <div class="video-sonuc">
-          <button type="button" class="video-k" data-buyut="${i}" aria-label="Büyük izle"><video src="${urller[i]}" playsinline muted loop autoplay></video><span class="buyut">⤢ Büyüt</span></button>
+          <div class="fav-kap"><button type="button" class="video-k" data-buyut="${i}" aria-label="Büyük izle"><video src="${urller[i]}" playsinline muted loop autoplay></video><span class="buyut">⤢ Büyüt</span></button>${yildiz(i)}</div>
           <div><b>${esc(f.name)}</b><div class="soluk">${mb(f.size)}</div>
             <div class="btn-satir" style="margin-top:8px"><button class="btn ana kucuk" data-paylas="${i}">Paylaş</button><button class="btn kucuk" data-indir="${i}">İndir</button></div></div>
         </div>`).join('')}
-        <p class="ipucu">Videoya dokunun → büyük önizleme. Paylaş → <b>Instagram</b> (Reels / Hikâye / Gönderi), <b>WhatsApp</b> ya da <b>Videoyu Kaydet</b> (Fotoğraflar'a). Müziği Instagram'da ekleyebilirsiniz.</p>`
+        <p class="ipucu">⭐ Beğendiğinizi yıldızla favorileyin: Ürün Galerisi'nde favoriler görünür, yeniden üretince silinmez. Videoya dokunun → büyük önizleme. Paylaş → <b>Instagram</b> (Reels / Hikâye), <b>WhatsApp</b> ya da <b>Videoyu Kaydet</b>.</p>`
       : `<h3>🖼️ Ürün görselleri <small class="soluk">${dosyalar.length} adet</small></h3>
-        <div class="gorsel-izgara">${dosyalar.map((f, i) => `<button type="button" class="gorsel-k" data-buyut="${i}" title="Büyük göster"><img src="${urller[i]}" alt=""><span class="buyut">⤢</span></button>`).join('')}</div>
+        <div class="gorsel-izgara">${dosyalar.map((f, i) => `<div class="fav-kap"><button type="button" class="gorsel-k" data-buyut="${i}" title="Büyük göster"><img src="${urller[i]}" alt=""><span class="buyut">⤢</span></button>${yildiz(i)}</div>`).join('')}</div>
         <div class="btn-satir" style="margin-top:10px"><button class="btn ana kucuk" data-hepsi="paylas">Hepsini paylaş</button><button class="btn kucuk" data-hepsi="indir">Hepsini indir</button></div>
-        <p class="ipucu">Bir görsele dokunun → büyük önizleme (oradan tek tek paylaşabilirsiniz). "Hepsini paylaş" ile Instagram'da çoklu gönderi yapabilir ya da <b>Görüntüleri Kaydet</b> ile Fotoğraflar'a alabilirsiniz.</p>`;
+        <p class="ipucu">⭐ Beğendiklerinizi yıldızla favorileyin: Ürün Galerisi'nde favoriler görünür, yeniden üretince silinmez. Bir görsele dokunun → büyük önizleme.</p>`;
     kap.addEventListener('click', async e => {
-      const t = e.target.closest('[data-paylas],[data-indir],[data-hepsi],[data-buyut]');
+      const t = e.target.closest('[data-paylas],[data-indir],[data-hepsi],[data-buyut],[data-fav]');
       if (!t) return;
-      if (t.dataset.buyut) medyaGoster(dosyalar.map((f, j) => ({ url: urller[j], video: tur === 'video', dosya: f })), +t.dataset.buyut);
+      if (t.dataset.fav) {
+        const k = kayitlar[t.dataset.fav];
+        const fav = await D.favoriYap(k.id, !k.fav).catch(() => k.fav);
+        k.fav = fav;
+        t.textContent = fav ? '⭐' : '☆'; t.classList.toggle('aktif', fav); t.setAttribute('aria-pressed', fav);
+        t.setAttribute('aria-label', fav ? 'Favoriden çıkar' : 'Favorilere ekle');
+        bildirim(fav ? "⭐ Favorilere eklendi · Ürün Galerisi'nde görünür" : 'Favoriden çıkarıldı');
+      }
+      else if (t.dataset.buyut) medyaGoster(dosyalar.map((f, j) => ({ url: urller[j], video: tur === 'video', dosya: f })), +t.dataset.buyut);
       else if (t.dataset.paylas) await dosyaPaylas(dosyalar[t.dataset.paylas]);
       else if (t.dataset.indir) dosyaIndir(dosyalar[t.dataset.indir]);
       else if (t.dataset.hepsi === 'indir') dosyalar.forEach((f, i) => setTimeout(() => dosyaIndir(f), i * 350));
