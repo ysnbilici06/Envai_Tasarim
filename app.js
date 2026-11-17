@@ -550,13 +550,14 @@ async function pdfVer(uret) {
   $('[data-k=gorsel]', d)?.addEventListener('click', async () => {
     const l = dosya.gorseller;
     if (navigator.canShare?.({ files: l })) {
-      try { await navigator.share({ files: l }); return; } catch (e) { if (e.name === 'AbortError') return; }
+      // Metin verilmezse bazı tarayıcılar sayfa linkini ekliyor → link yerine kısa müşteri bilgisi
+      try { await navigator.share(dosya.paylasMetni ? { files: l, text: dosya.paylasMetni } : { files: l }); return; } catch (e) { if (e.name === 'AbortError') return; }
     }
     l.forEach((f, i) => setTimeout(() => dosyaIndir(f), i * 350));
   });
   $('[data-k=paylas]', d).addEventListener('click', async () => {
     if (navigator.canShare?.({ files: [dosya] })) {
-      try { await navigator.share({ files: [dosya], title: dosya.name }); return; } catch (e) { if (e.name === 'AbortError') return; }
+      try { await navigator.share(dosya.paylasMetni ? { files: [dosya], text: dosya.paylasMetni } : { files: [dosya], title: dosya.name }); return; } catch (e) { if (e.name === 'AbortError') return; }
     }
     const a = document.createElement('a');
     a.href = url; a.download = dosya.name;
@@ -588,6 +589,20 @@ function isBittiSor(s) {
 }
 const isRaporu = s => pdfVer(() => R.isRaporuPdf(s, st, (DURUM[s.durum] || DURUM.teslim).ad));
 const musteriRaporu = s => pdfVer(() => O.musteriRaporuPdf(s));
+
+// ---------------------------------------------------------------- tema (açık / koyu / otomatik)
+// Seçim bu iPad'de saklanır; index.html'deki küçük betik açılışta aynı anahtarı okuyup yanıp sönmeyi önler.
+const TEMA_ANAHTAR = 'envai-tema';
+function temaAl() { try { return localStorage.getItem(TEMA_ANAHTAR) || 'otomatik'; } catch { return 'otomatik'; } }
+function temaKoy(k) {
+  try { k === 'otomatik' ? localStorage.removeItem(TEMA_ANAHTAR) : localStorage.setItem(TEMA_ANAHTAR, k); } catch { }
+  temaUygula();
+}
+function temaUygula() {
+  const k = temaAl(), kok = document.documentElement;
+  if (k === 'acik') kok.dataset.theme = 'light'; else if (k === 'koyu') kok.dataset.theme = 'dark'; else delete kok.dataset.theme;
+}
+temaUygula();
 
 function ayarlar() {
   const d = B.durum;
@@ -651,6 +666,13 @@ function ayarlar() {
     ${katListesi('Malzeme kategorileri', 'malzemeKategorileri', 'örn. Dantel', k => `<span class="avatar" style="--renk:var(--c6)">${malzEmoji(k)}</span>`)}
   </div>
   <div>
+    <div class="alt-baslik">Görünüm</div>
+    <div class="kart ic">
+      <div class="tema-sec" role="radiogroup" aria-label="Tema">${[['acik', '☀️', 'Açık', 'Beyaz arka plan'], ['koyu', '🌙', 'Koyu', 'Gece için'], ['otomatik', '🔄', 'Otomatik', "iPad'e göre"]]
+        .map(([k, e, a, alt]) => `<button type="button" class="tema-btn ${temaAl() === k ? 'aktif' : ''}" role="radio" aria-checked="${temaAl() === k}" data-act="tema" data-id="${k}"><span class="e">${e}</span><b>${a}</b><small>${alt}</small></button>`).join('')}</div>
+      <p class="ipucu" style="margin-top:10px">Otomatik: iPad gece moduna geçince uygulama da koyu olur. Raporlar ve PDF'ler her zaman beyaz zeminde çıkar.</p>
+    </div>
+
     ${d.kurulu ? `<div class="alt-baslik">iPhone ⇄ iPad eşitleme</div>
     <div class="kart ic">${bulutHtml}</div>` : ''}
 
@@ -720,6 +742,7 @@ const EYLEM = {
     if ((prompt('PIN\'i tekrar yazın:') || '').trim() !== p1) return bildirim('PIN\'ler aynı değil');
     await K.pinKoy(p1); ciz(); bildirim('🔒 Kilit açıldı: uygulama her açılışta PIN soracak');
   },
+  tema: k => { temaKoy(k); ciz(); bildirim(k === 'acik' ? '☀️ Açık tema' : k === 'koyu' ? '🌙 Koyu tema' : "🔄 Tema iPad'e göre"); },
   'pin-kaldir': () => { if (confirm('Uygulama kilidi kaldırılsın mı?')) { K.pinKaldir(); ciz(); bildirim('Kilit kaldırıldı'); } },
   'satis-ilerlet': id => {
     const s = structuredClone(st.satislar[id]);

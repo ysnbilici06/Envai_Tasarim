@@ -139,15 +139,15 @@ export function fisPdf(s, tur = 'fis') {
 }
 
 // ---------------------------------------------------------------- müşteri teslim raporu PDF
-/** Raporun ortasına konacak ürün görseli: stüdyoda üretilen (önce logolu vitrin, kare/dikey),
- *  yoksa çekilen fotoğraf. data URL döner (html2canvas güvenle çizsin). */
+/** Raporun ortasına konacak ürün görseli: SADE ürün fotoğrafı (kullanıcı isteği: yazılı/çerçeveli
+ *  tanıtım görseli değil). Çekilen fotoğraf yoksa üretilenlerden en sadesi (vitrin olmayan).
+ *  data URL döner (html2canvas güvenle çizsin). */
 async function urunGorseli(satisId) {
   const sahip = 'satis:' + satisId;
   const resim = x => !(x.blob?.type || '').startsWith('video');
-  const uretilen = (await D.liste(sahip, 'uretilen').catch(() => [])).filter(resim);
-  const puan = x => (/vitrin/.test(x.ad) ? 4 : 0) + (/-kare-/.test(x.ad) ? 2 : /-dikey-/.test(x.ad) ? 1 : 0);
-  const sec = uretilen.sort((a, b) => puan(b) - puan(a) || a.eklendi - b.eklendi)[0]
-    || (await D.liste(sahip, 'urun').catch(() => [])).filter(resim)[0];
+  const puan = x => (/vitrin/.test(x.ad) ? -4 : 0) + (/-kare-/.test(x.ad) ? 2 : /-dikey-/.test(x.ad) ? 1 : 0);
+  const sec = (await D.liste(sahip, 'urun').catch(() => [])).filter(resim)[0]
+    || (await D.liste(sahip, 'uretilen').catch(() => [])).filter(resim).sort((a, b) => puan(b) - puan(a) || a.eklendi - b.eklendi)[0];
   if (!sec) return null;
   const url = await new Promise((ok, hata) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = hata; r.readAsDataURL(sec.blob); });
   const img = await new Promise((ok, hata) => { const i = new Image(); i.onload = () => ok(i); i.onerror = hata; i.src = url; });
@@ -163,7 +163,7 @@ export async function musteriRaporuPdf(s) {
   // Görseli sayfanın ortasına sığdır (html2canvas object-fit desteklemiyor: ölçü elle)
   let resimHtml = '';
   if (gorsel) {
-    const enW = 540, enH = 360, o2 = Math.min(enW / gorsel.w, enH / gorsel.h);
+    const enW = 660, enH = 415, o2 = Math.min(enW / gorsel.w, enH / gorsel.h);
     resimHtml = `<div class="rp-blok mr-gorsel"><img src="${gorsel.url}" width="${Math.round(gorsel.w * o2)}" height="${Math.round(gorsel.h * o2)}" alt=""></div>`;
   }
   const siparisT = z.alindi || (s.tarih ? s.tarih + (s.saat ? 'T' + s.saat : '') : '');
@@ -171,7 +171,7 @@ export async function musteriRaporuPdf(s) {
   const ig = m?.instagram ? '@' + m.instagram.replace(/^@/, '') : (/^@/.test(s.musteri || '') ? s.musteri : '');
   const musteriSatir = [
     ['Ad soyad', m?.ad || (s.musteri || '').replace(/^@/, '')], ['Telefon', m?.telefon], ['Adres', m?.adres],
-    ['Instagram', ig], ['Diğer sosyal medya', m?.sosyal],
+    ['Instagram', ig], ['Sosyal medya', m?.sosyal],
   ].filter(([, v]) => v && String(v).trim());
   const dukkan = [st.ayar.instagram && 'Instagram: @' + st.ayar.instagram.replace(/^@/, ''), st.ayar.whatsapp && 'WhatsApp: ' + st.ayar.whatsapp].filter(Boolean);
   const kart = (e, d, alt = '') => `<div class="rp-kartcik"><div class="e">${e}</div><div class="d">${d}</div>${alt ? `<div class="e">${alt}</div>` : ''}</div>`;
@@ -198,7 +198,12 @@ export async function musteriRaporuPdf(s) {
     .rp .mr-baslik span { color: #6b6f8c; font-size: 12px; }
     .rp .mr-selam { margin: 0 0 12px; padding: 10px 14px; border-radius: 10px; background: #f1effc; color: #3b2a7a; font-size: 13px; }
     .rp .mr-gorsel { display: flex; justify-content: center; margin: 2px 0 14px; }
-    .rp .mr-gorsel img { border-radius: 14px; box-shadow: 0 6px 24px rgba(28,26,58,.18); display: block; border: 1px solid #ece9f8; }
+    .rp .mr-gorsel img { border-radius: 8px; display: block; }
+    .rp .mr-tanim { margin: -4px 0 10px; font-size: 12.5px; color: #4a4766; }
+    .rp .mr-musteri { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22px; }
+    .rp .mr-musteri div { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid #ece9f8; font-size: 12.5px; }
+    .rp .mr-musteri span { color: #6b6f8c; width: 92px; flex-shrink: 0; }
+    .rp .mr-musteri b { color: #1c1a3a; }
     .rp .rp-kartcik .d { font-size: 14px; }
     .rp .mr-tesekkur { margin-top: 16px; display: flex; gap: 16px; align-items: center; padding: 14px 18px; border-radius: 12px;
       background: linear-gradient(135deg, #f4f0ff, #fdf2f6); border: 1px solid #e6defa; }
@@ -216,6 +221,7 @@ export async function musteriRaporuPdf(s) {
   </div>
   <div class="mr-serit"></div>
   <div class="mr-baslik rp-blok"><h1>${esc(s.urunAd || 'Özel iş')}</h1><span>${esc([s.kategori, `${sayi(s.adet || 1)} adet`].filter(Boolean).join(' · '))}</span></div>
+  ${s.urunTanim ? `<div class="mr-tanim">${esc(s.urunTanim)}</div>` : ''}
   <div class="mr-selam">${ad ? `Sayın <b>${esc(ad)}</b>, ` : ''}siparişiniz özenle hazırlandı${s.durum === 'teslim' ? ' ve teslim edildi' : ' ve teslime hazır'}. Bilgileri aşağıda bulabilirsiniz.</div>
   ${resimHtml}
   <div class="rp-kartlar">
@@ -224,17 +230,8 @@ export async function musteriRaporuPdf(s) {
     ${kart(z.teslim ? 'Teslim tarihi' : 'Teslim (planlanan)', esc(tarihSaatYaz(teslimT)))}
     ${kart('Ödeme', o.kalan > 0 ? `<span class="negatif">Kalan ${para(o.kalan)}</span>` : '<span class="pozitif">Ödendi</span>', o.kalan > 0 && o.tahsil ? 'Ödenen ' + para(o.tahsil) : '')}
   </div>
-  <div class="rp-iki">
-    <div class="rp-blok"><h3>Müşteri bilgileri</h3>
-      <table class="tablo"><tbody>${musteriSatir.map(([k, v]) => `<tr><td>${k}</td><td><b>${esc(v)}</b></td></tr>`).join('') || '<tr><td><small>Müşteri bilgisi girilmemiş</small></td></tr>'}</tbody></table></div>
-    <div class="rp-blok"><h3>Ürün</h3>
-      <table class="tablo"><tbody>
-        <tr><td>Ürün</td><td><b>${esc(s.urunAd || 'Özel iş')}</b></td></tr>
-        ${s.urunTanim ? `<tr><td>Açıklama</td><td>${esc(s.urunTanim)}</td></tr>` : ''}
-        <tr><td>Adet</td><td>${sayi(s.adet || 1)}</td></tr>
-        <tr><td>Birim fiyat</td><td>${para(s.birimFiyat || 0)}</td></tr>
-      </tbody></table></div>
-  </div>
+  <div class="rp-blok"><h3>Müşteri bilgileri</h3>
+    ${musteriSatir.length ? `<div class="mr-musteri">${musteriSatir.map(([k, v]) => `<div><span>${k}</span><b>${esc(v)}</b></div>`).join('')}</div>` : '<p class="soluk" style="margin:0;font-size:12px">Müşteri bilgisi girilmemiş</p>'}</div>
   <div class="mr-tesekkur rp-blok"><img src="logo/envai-amblem.png" alt="">
     <div><h4>Bizi tercih ettiğiniz için teşekkür ederiz!</h4>
       <p>Ürününüz size özel olarak, büyük bir özen ve titizlikle hazırlandı; güzel günlerde kullanmanızı dileriz. Memnuniyetiniz bizim için en büyük ödül:
@@ -242,5 +239,12 @@ export async function musteriRaporuPdf(s) {
       <p class="mr-imza">Sevgiyle, Envai Tasarım</p>
       <div class="mr-alt">${dukkan.map(x => { const [k, v] = x.split(': '); return `<span>${esc(k)}: <b>${esc(v)}</b></span>`; }).join('')}<span>Yeni siparişleriniz için bize her zaman yazabilirsiniz</span></div></div></div>`;
   const dosya = 'Teslim-raporu-' + (ad || s.urunAd || 'musteri').replace(/[\/:*?"<>|@]+/g, '').replace(/\s+/g, '-').slice(0, 40);
-  return pdfUret(govde, dosya + '.pdf');
+  const pdf = await pdfUret(govde, dosya + '.pdf');
+  // Paylaşırken link yerine giden kısa mesaj (WhatsApp'ta dosyanın yanında görünür)
+  pdf.paylasMetni = [
+    `${ad ? `Merhaba ${ad} 🌸 ` : ''}${s.urunAd ? s.urunAd + ' siparişiniz' : 'Siparişiniz'} ${s.durum === 'teslim' ? 'teslim edildi' : 'teslime hazır'}.`,
+    [no && `Sipariş no: ${no}`, `Tutar: ${para(h.ciro)}`, teslimT && `Teslim: ${tarihSaatYaz(teslimT)}`].filter(Boolean).join(' · '),
+    'Teslim raporunuz ektedir. Bizi tercih ettiğiniz için teşekkür ederiz. Envai Tasarım',
+  ].join('\n');
+  return pdf;
 }

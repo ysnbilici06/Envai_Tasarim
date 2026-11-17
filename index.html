@@ -21,6 +21,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="style.css">
+<script>/* Tema seçimi (Ayarlar → Görünüm) sayfa çizilmeden uygulansın */
+try { var t = localStorage.getItem('envai-tema'); if (t === 'acik') document.documentElement.dataset.theme = 'light'; else if (t === 'koyu') document.documentElement.dataset.theme = 'dark'; } catch (e) { }</script>
 </head>
 <body>
 <!-- Açılış: uygulama her başladığında logo kısa süre görünür -->
